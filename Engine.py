@@ -1,8 +1,12 @@
+from operator import itemgetter
+from collections import defaultdict
 from pynput import keyboard
 from typing import Callable
 
 class Engine(object):
     KB_EVENT = ['press', 'release']
+    VR_KEYS = ['']
+
     def __init__(self, width, height, debug=False) -> None:
         super().__init__()
         self.width = width
@@ -10,16 +14,21 @@ class Engine(object):
         self.debug = debug
 
         self._timestamp = 0
+        self._kb_callback = {e: defaultdict(list) for e in self.KB_EVENT}
         self.map = [['*'] * width] * height
-        self.end = False
+        self.isend = False
     
     def start(self) -> bool:
-        while not self.end:
-            print(self.end)
+        while not self.isend:
             self.render_map()
             self._listen()
-        return self._end()
     
+    def end(self) -> None:
+        print('end')
+        self.isend = True
+        self._end()
+        return True
+
     # Map
     def render_map(self) -> None:
         print()
@@ -40,8 +49,35 @@ class Engine(object):
     def add_event(self) -> bool:
         ...
     
-    def subscribe_keyboard(self, key: str, event: str, callback: Callable) -> bool:
-        ...
+    def subscribe_keyboard(self, key: str, action: str, callback: Callable) -> bool:
+        """ Subscribe to a certain keyboard event. 
+        The key name of special keys be the same as pynput keycode: 
+          https://pynput.readthedocs.io/en/stable/keyboard.html?highlight=key#pynput.keyboard.Key
+        """
+        if action not in self.KB_EVENT: 
+            self.log(f'action "{action}" not allowed. Callback not subscribed', 'warn')
+            self.log(f'Available actions: {self.KB_EVENT}', 'warn')
+            return False
+
+        if key in keyboard.Key._member_names_:
+            key = itemgetter(key)(keyboard.Key)
+        else:
+            key = keyboard.KeyCode.from_char(key)
+        self._kb_callback[action][key].append(callback)
+        self.log(f'event "{action} {key}" subscribed')
+        return True
+
+    def unsubscribe_keyboard(self, key: str, action: str, callback: Callable) -> bool:
+        """ Unsubscribe the first occurence of given callback """
+        if action not in self.KB_EVENT: 
+            self.log(f'action "{action}" not found', 'warn')
+            return False
+        if callback not in self._kb_callback[action][key]:
+            self.log(f'callback {callback.__name__} not found', 'warn')
+            return False
+
+        self._kb_callback[action][key].remove(callback)
+        return True
     
     def subscribe(self) -> bool:
         ...
@@ -69,8 +105,9 @@ class Engine(object):
             self._handle_keyboard(event)
 
     def _handle_keyboard(self, event) -> None:
-        if event.key == keyboard.Key.esc:
-            self.end = True
+        action = type(event).__name__.lower()
+        for cb in self._kb_callback[action][event.key]:
+            cb()
 
     def log(self, message, level='debug') -> str:
         if level.lower() == 'debug' and not self.debug: return
