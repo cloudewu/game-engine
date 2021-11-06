@@ -1,7 +1,54 @@
+#### TODO: MAP RENDERING ###
+
 from operator import itemgetter
 from collections import defaultdict
 from typing import Callable, Tuple
 from pynput import keyboard
+
+class Item(object):
+    EVENT = ['enter', 'leave', 'timeout']
+
+    def __init__(self, x, y, symbol='*', hidden=False) -> None:
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.symbol = symbol
+        self.hidden = hidden
+
+        self._callback = {e: [] for e in self.EVENT}
+    
+    def position(self) -> list:
+        return [self.x, self.y]
+    
+    def add_event(self, action: str, callback: Callable) -> bool:
+        if action not in self.EVENT:
+            self.log(f'action "{action}" not allowed. Event not registered', 'warn')
+            self.log(f'Available actions: {self.EVENT}', 'warn')
+            return False
+        
+        self._callback[action].append(callback)
+        return True
+
+    def remove_event(self, action: str, callback: Callable) -> bool:
+        if action not in self.EVENT:
+            self.log(f'action "{action}" not found', 'warn')
+            return False
+        if callback not in self._callback[action]:
+            self.log(f'callback {callback.__name__} not found', 'warn')
+            return False
+
+        self._callback[action].remove(callback)
+        return True
+    
+    def fire(self, action: str) -> bool:
+        if action not in self.EVENT:
+            self.log(f'action "{action}" not exist. Event not fired', 'warn')
+            return False
+
+        for cb in self.EVENT[action]:
+            cb()
+        return True
+
 
 class Engine(object):
     KB_EVENT = ['press', 'release']
@@ -22,12 +69,17 @@ class Engine(object):
         self.debug = debug
 
         self.character = [int(width/2), int(height/2)]
-        self.map = [['*'] * width] * height
+        self.map = [[None for _ in range(width)] for _ in range(height)]
         self.isend = False
 
         self._timestamp = 0
         self._kb_callback = {e: defaultdict(list) for e in self.KB_EVENT}
         self._subscription = {e: [] for e in self.EVENT}
+
+        # debug
+        self.map[4][10] = Item(4,7)
+        # [end] debug
+        print(self.map)
 
     def start(self) -> bool:
         while not self.isend:
@@ -58,19 +110,21 @@ class Engine(object):
         for j in range(self.height):
             print('|', end='')
             for i in range(self.width):
-                if i == self.character[0] and j == self.character[1]:
-                    print('x', end='')
-                else:
-                    print('.', end='')
+                symbol = self._get_map(i, j)
+                print(symbol, end='')
             print('|')
         print('\'', '-' * self.width, '\'', sep='')
-        return True
+        return
 
     def update_map(self) -> bool:
         # [ TODO ]
         ...
 
     # Subscriber
+    def add_item(self, x: int, y: int, name: str, symbol: str) -> bool:
+        # [ TODO ]
+        ...
+
     def add_event(self) -> bool:
         # [ TODO ]
         ...
@@ -157,6 +211,12 @@ class Engine(object):
             self.move(self.CONTROL_KEY[event.key])
         for cb in self._kb_callback[action][event.key]:
             cb()
+    
+    def _get_map(self, i: int, j: int) -> str:
+        if i == self.character[0] and j == self.character[1]:
+            return 'x'
+        item = self.map[j][i]
+        return item.symbol if item else ' '
 
     def log(self, message, level='debug') -> str:
         if level.lower() == 'debug' and not self.debug: return
