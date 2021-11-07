@@ -129,6 +129,7 @@ class Engine(object):
         self._timestamp = 0
         self._kb_callback = {e: defaultdict(list) for e in self.KB_EVENT}
         self._subscription = {e: [] for e in self.EVENT}
+        self._timer = {}
 
     def start(self) -> bool:
         while not self.isend:
@@ -215,6 +216,30 @@ class Engine(object):
                 flag = True
         return flag
 
+    def timer(self, time: int, callback: Callable) -> int:
+        id = random.randint(1000, 10000)
+        self.log(f'timer {id} is added')
+        self._timer[id] = [time, callback]
+        return id
+
+    def tik_timer(self) -> None:
+        dead = []
+        for id, obj in self._timer.items():
+            obj[0] -= 1
+            if obj[0] <= 0:
+                obj[1](self)
+                dead.append(id)
+        for id in dead:
+            self.remove_timer(id)
+    
+    def remove_timer(self, id: int) -> bool:
+        if id not in self._timer:
+            self.log(f'timer {id} not found ({self.name})', 'warn')
+            return False
+        del self._timer[id]
+        print(id, self._timer)
+        return True
+
     def add_event(self) -> bool:
         # [ TODO ]
         ...
@@ -275,10 +300,6 @@ class Engine(object):
         # return True
         ...
     
-    def timer(self) -> bool:
-        # [ TODO ]
-        ...
-    
     # utilities
     def _next(self) -> int:
         self._timestamp += 1
@@ -318,7 +339,7 @@ class Engine(object):
             alive = item.check_alive(self._timestamp)
             if not alive:
                 self._clean_tile(rid, cid)
-        
+        self.tik_timer()
     
     def _get_tile(self, x: int, y: int) -> str:
         if x == self.character[0] and y == self.character[1]:
