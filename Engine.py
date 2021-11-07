@@ -116,16 +116,14 @@ class Engine(BaseObject):
         keyboard.Key.left: 'left'
     }
 
-    def __init__(self, width, height, move, debug=False) -> None:
+    def __init__(self, width, height, move_function, map_renderer = None, debug=False) -> None:
         super().__init__(debug)
 
         self.width = width
         self.height = height
-        self.move_cb = move
+        self.move_cb = move_function
 
         self.character = [int(height/2), int(width/2)] # x, y
-        self.layer = 'map'
-        self.renderer = self.default_map_renderer
         self.map = [[None for _ in range(width)] for _ in range(height)]
         self.backpack = ['apple']
         self.isend = False
@@ -133,8 +131,11 @@ class Engine(BaseObject):
         self._timestamp = 0
         self._kb_callback = {e: defaultdict(list) for e in self.KB_EVENT}
         self._subscription = {e: [] for e in self.EVENT}
-        self._layer_renderer = {'map': self.default_map_renderer}
+        self._layer_renderer = {'map': map_renderer or self.default_map_renderer}
         self._timer = {}
+
+        self.layer = 'map'
+        self.renderer = self._layer_renderer[self.layer]
 
     def start(self) -> bool:
         while not self.isend:
