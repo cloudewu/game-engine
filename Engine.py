@@ -1,4 +1,11 @@
-#### TODO: MAP RENDERING ###
+"""
+[Map]
+x/y 0 -> 1
+0
+v
+1
+
+"""
 
 from operator import itemgetter
 from collections import defaultdict
@@ -6,12 +13,15 @@ from typing import Callable, Tuple
 from pynput import keyboard
 
 class Item(object):
-    EVENT = ['enter', 'leave', 'timeout']
+    EVENT = ['enter', 'leave', 'timeout', 'removed']
 
-    def __init__(self, x, y, symbol='*', hidden=False) -> None:
+    def __init__(self, name, x, y, create_time, symbol='*', timeout=None, hidden=False) -> None:
         super().__init__()
+        self.name = name
         self.x = x
         self.y = y
+        self.created = create_time
+        self.timeout = timeout
         self.symbol = symbol
         self.hidden = hidden
 
@@ -45,9 +55,16 @@ class Item(object):
             self.log(f'action "{action}" not exist. Event not fired', 'warn')
             return False
 
-        for cb in self.EVENT[action]:
+        for cb in self._callback[action]:
             cb()
         return True
+    
+    def check_status(self, timestamp) -> bool:
+        """ Return whether this item is timeout """
+        if self.timeout and (timestamp > self.created + self.timeout):
+            self.hidden = True
+            return True
+        return False
 
 
 class Engine(object):
@@ -68,7 +85,7 @@ class Engine(object):
         self.move_cb = move
         self.debug = debug
 
-        self.character = [int(width/2), int(height/2)]
+        self.character = [int(height/2), int(width/2)] # x, y
         self.map = [[None for _ in range(width)] for _ in range(height)]
         self.isend = False
 
@@ -76,15 +93,11 @@ class Engine(object):
         self._kb_callback = {e: defaultdict(list) for e in self.KB_EVENT}
         self._subscription = {e: [] for e in self.EVENT}
 
-        # debug
-        self.map[4][10] = Item(4,7)
-        # [end] debug
-        print(self.map)
-
     def start(self) -> bool:
         while not self.isend:
             self.render_map()
-            self._listen()
+            while not self._listen(): pass
+            self._next()
 
     def end(self) -> None:
         self.isend = True
@@ -107,9 +120,9 @@ class Engine(object):
         print()
         print(f'time: {self._timestamp:3}')
         print('.', '-' * self.width, '.', sep='')
-        for j in range(self.height):
+        for i in range(self.height):
             print('|', end='')
-            for i in range(self.width):
+            for j in range(self.width):
                 symbol = self._get_map(i, j)
                 print(symbol, end='')
             print('|')
@@ -121,9 +134,49 @@ class Engine(object):
         ...
 
     # Subscriber
-    def add_item(self, x: int, y: int, name: str, symbol: str) -> bool:
-        # [ TODO ]
-        ...
+    def add_item(self, name: str, x: int, y: int, symbol: str, hidden: bool = False, timeout: int = None) -> Item:
+        if len(symbol) > 1:
+            self.log(f'Item symbol can only be a single character. Received "{symbol}"', 'error')
+            self.log(f'Item not added', 'warn')
+            return None
+        
+        if len(symbol) == 0:
+            self.log('Symbol is automatically transformed into space', 'warn')
+            symbol = ' '
+
+        new_item = Item(name, x, y, self._timestamp, symbol, timeout, hidden)
+
+        if self.map[x][y] is not None:
+            self.log(f'Original item on ({x}, {y}) is replaced', 'warn')
+            self._clean_tile(x, y)
+        self.map[x][y] = new_item
+        self.log(f'Item {name} is added to ({x}, {y})')
+
+        return new_item
+    
+    def remove_item(self, x: int = None, y: int = None, name: str = None) -> bool:
+        if (x or y) and not (x and y):
+            self.log(f'(x, y) should be specified at the same time', 'error')
+            return False
+        
+        if x and not name:
+            self._clean_tile(x, y)
+            return True
+
+        if x:
+            if not self.map[x][y]:
+                return False
+            if self.map[x][y].name == name: 
+                self._clean_tile[x][y]
+                return True
+            return False
+        
+        flag = False
+        for rid, cid, item in self._get_items():
+            if item.name == name:
+                self._clean_tile(rid, cid)
+                flag = True
+        return flag
 
     def add_event(self) -> bool:
         # [ TODO ]
@@ -192,31 +245,65 @@ class Engine(object):
     # utilities
     def _next(self) -> int:
         self._timestamp += 1
+        self._check_event()
         return self._timestamp
     
     def _cleanup(self) -> bool:
         print('\n - end - \n')
         return True
     
-    def _listen(self) -> None:
+    def _listen(self) -> bool:
         with keyboard.Events() as events:
             event = events.get()
             self.log('Received event {}'.format(event))
-            self._handle_keyboard(event)
+            updated = self._handle_keyboard(event)
+        return updated
 
-    def _handle_keyboard(self, event) -> None:
+    def _handle_keyboard(self, event) -> bool:
+        flag = False
         action = type(event).__name__.lower()
 
         if action == 'press' and event.key in self.CONTROL_KEY:
             self.move(self.CONTROL_KEY[event.key])
+            flag = True
         for cb in self._kb_callback[action][event.key]:
             cb()
+            flag = True
+        return flag
     
-    def _get_map(self, i: int, j: int) -> str:
-        if i == self.character[0] and j == self.character[1]:
+    def _check_event(self):
+        for rid, cid, item in self._get_items():
+            if rid == self.character[0] and cid == self.character[1]:
+                item.fire('enter')
+            
+            timeout = item.check_status(self._timestamp)
+            if timeout:
+                self._clean_tile(rid, cid)
+        
+    
+    def _get_map(self, x: int, y: int) -> str:
+        if x == self.character[0] and y == self.character[1]:
             return 'x'
-        item = self.map[j][i]
+        item = self.map[x][y]
         return item.symbol if item else ' '
+    
+    def _get_items(self) -> Tuple[int,int,Item]:
+        for rid, row in enumerate(self.map):
+            for cid, item in enumerate(row):
+                if item: yield rid, cid, item
+    
+    def _clean_tile(self, x: int, y: int) -> bool:
+        item = self.map[x][y]
+        if not item: return False
+        item.fire('removed')
+        self.map[x][y] = None
+        self.log(f'Item {item.name} is removed')
+        return True
+    
+    def _print_map(self):
+        """ For debugging """
+        for row in self.map:
+            self.log(row)
 
     def log(self, message, level='debug') -> str:
         if level.lower() == 'debug' and not self.debug: return
