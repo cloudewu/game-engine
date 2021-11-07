@@ -25,6 +25,8 @@ class Item(object):
         self.symbol = symbol
         self.hidden = hidden
 
+        self.istouched = False
+
         self._callback = {e: [] for e in self.EVENT}
         self._timer = {}
     
@@ -83,6 +85,10 @@ class Item(object):
         if action == 'timeout':
             self._timer[args[0]][1](self)
             del self._timer[args[0]]
+        elif action == 'enter':
+            self.istouched = True
+        elif action == 'leave':
+            self.istouched = False
 
         for cb in self._callback[action]:
             cb(self)
@@ -306,6 +312,8 @@ class Engine(object):
         for rid, cid, item in self._get_items():
             if rid == self.character[0] and cid == self.character[1]:
                 item.fire('enter')
+            elif item.istouched:
+                item.fire('leave')
             
             alive = item.check_alive(self._timestamp)
             if not alive:
