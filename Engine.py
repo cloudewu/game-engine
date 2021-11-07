@@ -4,31 +4,35 @@ x/y 0 -> 1
 0
 v
 1
-
 """
 
 from operator import itemgetter
 from collections import defaultdict
 from typing import Callable, Tuple
+import random
 from pynput import keyboard
 
 class Item(object):
     EVENT = ['enter', 'leave', 'timeout', 'removed']
 
-    def __init__(self, name, x, y, create_time, symbol='*', timeout=None, hidden=False) -> None:
+    def __init__(self, name, x, y, create_time, symbol='*', life=None, hidden=False) -> None:
         super().__init__()
         self.name = name
         self.x = x
         self.y = y
         self.created = create_time
-        self.timeout = timeout
+        self.life = life
         self.symbol = symbol
         self.hidden = hidden
 
         self._callback = {e: [] for e in self.EVENT}
+        self._timer = {}
     
     def position(self) -> list:
         return [self.x, self.y]
+    
+    def show(self, flag: bool):
+        self.hidden = not flag
     
     def add_event(self, action: str, callback: Callable) -> bool:
         if action not in self.EVENT:
@@ -50,27 +54,54 @@ class Item(object):
         self._callback[action].remove(callback)
         return True
     
-    def fire(self, action: str) -> bool:
+    def timer(self, time: int, callback: Callable) -> int:
+        id = random.randint(1000, 10000)
+        self._timer[id] = [time, callback]
+        return id
+
+    def tik_timer(self) -> None:
+        dead = []
+        for id, obj in self._timer.items():
+            obj[0] -= 1
+            if obj[0] <= 0:
+                dead.append(id)
+        for id in dead:
+            self.fire('timeout', id)
+    
+    def remove_timer(self, id: int) -> bool:
+        if id not in self._timer:
+            self.log(f'timer {id} not found ({self.name})', 'warn')
+            return False
+        del self._timer[id]
+        return True
+    
+    def fire(self, action: str, *args) -> bool:
         if action not in self.EVENT:
             self.log(f'action "{action}" not exist. Event not fired', 'warn')
             return False
 
+        if action == 'timeout':
+            self._timer[args[0]][1](self)
+            del self._timer[args[0]]
+
         for cb in self._callback[action]:
-            cb()
+            cb(self)
         return True
     
-    def check_status(self, timestamp) -> bool:
-        """ Return whether this item is timeout """
-        if self.timeout and (timestamp > self.created + self.timeout):
+    def check_alive(self, timestamp) -> bool:
+        """ Daily update """
+        if self.life and (timestamp > self.created + self.life):
             self.hidden = True
-            return True
-        return False
+            return False
+        self.tik_timer()
+        return True
 
 
 class Engine(object):
     KB_EVENT = ['press', 'release']
     EVENT = []
     CONTROL_KEY = {
+        # Make sure you know what you are doing when changing these properties 
         keyboard.Key.up: 'up', 
         keyboard.Key.down: 'down', 
         keyboard.Key.right: 'right', 
@@ -123,7 +154,7 @@ class Engine(object):
         for i in range(self.height):
             print('|', end='')
             for j in range(self.width):
-                symbol = self._get_map(i, j)
+                symbol = self._get_tile(i, j)
                 print(symbol, end='')
             print('|')
         print('\'', '-' * self.width, '\'', sep='')
@@ -134,7 +165,7 @@ class Engine(object):
         ...
 
     # Subscriber
-    def add_item(self, name: str, x: int, y: int, symbol: str, hidden: bool = False, timeout: int = None) -> Item:
+    def add_item(self, name: str, x: int, y: int, symbol: str, hidden: bool = False, life: int = None) -> Item:
         if len(symbol) > 1:
             self.log(f'Item symbol can only be a single character. Received "{symbol}"', 'error')
             self.log(f'Item not added', 'warn')
@@ -144,7 +175,7 @@ class Engine(object):
             self.log('Symbol is automatically transformed into space', 'warn')
             symbol = ' '
 
-        new_item = Item(name, x, y, self._timestamp, symbol, timeout, hidden)
+        new_item = Item(name, x, y, self._timestamp, symbol, life, hidden)
 
         if self.map[x][y] is not None:
             self.log(f'Original item on ({x}, {y}) is replaced', 'warn')
@@ -267,7 +298,7 @@ class Engine(object):
             self.move(self.CONTROL_KEY[event.key])
             flag = True
         for cb in self._kb_callback[action][event.key]:
-            cb()
+            cb(self)
             flag = True
         return flag
     
@@ -276,16 +307,16 @@ class Engine(object):
             if rid == self.character[0] and cid == self.character[1]:
                 item.fire('enter')
             
-            timeout = item.check_status(self._timestamp)
-            if timeout:
+            alive = item.check_alive(self._timestamp)
+            if not alive:
                 self._clean_tile(rid, cid)
         
     
-    def _get_map(self, x: int, y: int) -> str:
+    def _get_tile(self, x: int, y: int) -> str:
         if x == self.character[0] and y == self.character[1]:
             return 'x'
         item = self.map[x][y]
-        return item.symbol if item else ' '
+        return item.symbol if item and not item.hidden else ' '
     
     def _get_items(self) -> Tuple[int,int,Item]:
         for rid, row in enumerate(self.map):
