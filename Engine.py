@@ -35,8 +35,9 @@ class Item(BaseObject):
     def position(self) -> list:
         return [self.x, self.y]
     
-    def show(self, flag: bool):
+    def show(self, flag: bool = True) -> None:
         self.hidden = not flag
+        return
     
     def add_event(self, action: str, callback: Callable) -> bool:
         if action not in self.EVENT:
@@ -107,7 +108,7 @@ class Item(BaseObject):
 
 class Engine(BaseObject):
     KB_EVENT = ['press', 'release']
-    DEFAULT_EVENT = ['onstart', 'update_map', 'onend']
+    DEFAULT_EVENT = ['onstart', 'update_map', 'new_step', 'onend']
     CONTROL_KEY = {
         # Make sure you know what you are doing when changing these properties 
         keyboard.Key.up: 'up', 
@@ -347,6 +348,7 @@ class Engine(BaseObject):
         self._timestamp += 1
         self._check_event()
         self.tik_timer()
+        self.fire('new_step')
         return self._timestamp
     
     def _cleanup(self) -> bool:
