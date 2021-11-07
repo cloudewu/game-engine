@@ -107,7 +107,7 @@ class Item(BaseObject):
 
 class Engine(BaseObject):
     KB_EVENT = ['press', 'release']
-    EVENT = []
+    DEFAULT_EVENT = ['onstart', 'update_map', 'onend']
     CONTROL_KEY = {
         # Make sure you know what you are doing when changing these properties 
         keyboard.Key.up: 'up', 
@@ -130,7 +130,7 @@ class Engine(BaseObject):
 
         self._timestamp = 0
         self._kb_callback = {e: defaultdict(list) for e in self.KB_EVENT}
-        self._subscription = {e: [] for e in self.EVENT}
+        self._subscription = {e: [] for e in self.DEFAULT_EVENT}
         self._layer_renderer = {'map': map_renderer or self.default_map_renderer}
         self._timer = {}
 
@@ -138,6 +138,7 @@ class Engine(BaseObject):
         self.renderer = self._layer_renderer[self.layer]
 
     def start(self) -> bool:
+        self.fire('onstart')
         while not self.isend:
             self.renderer(self)
             while not self._listen(): pass
@@ -145,6 +146,7 @@ class Engine(BaseObject):
 
     def end(self) -> None:
         self.isend = True
+        self.fire('onend')
         self._cleanup()
         return True
 
@@ -270,10 +272,46 @@ class Engine(BaseObject):
         print(id, self._timer)
         return True
 
-    def add_event(self) -> bool:
-        # [ TODO ]
-        ...
+    def fire(self, event: str, *args) -> bool:
+        if event not in self._subscription.keys():
+            self.log(f'event "{event}" not exist. Event not fired', 'warn')
+            return False
+
+        for cb in self._subscription[event]:
+            cb(self)
+        return True
+
+    def add_event(self, name: str) -> bool:
+        if name in self._subscription.keys():
+            self.log(f'event {name} already existed.', 'warn')
+            return False
+        
+        self._subscription[name] = []
+        self.log(f'event {name} is added')
+        return True
     
+    def subscribe(self, event: str, callback: Callable) -> bool:
+        if event not in self._subscription.keys():
+            self.log(f'Event "{event}" not exists. Callback not subscribed', 'warn')
+            self.log(f'Available events: {list(self._subscription.keys())}', 'warn')
+            return False
+    
+        self._subscription[event].append(callback)
+        self.log(f'callback {callback.__name__} is subscribed to event {event}')
+        return True
+
+    def unsubscribe(self, event: str, callback: Callable) -> bool:
+        if event not in self._subscription.keys():
+            self.log(f'event "{event}" not found', 'warn')
+            return False
+        if callback not in self._subscription[event]:
+            self.log(f'callback {callback.__name__} not found', 'warn')
+            return False
+
+        self._subscription[event].remove(callback)
+        self.log(f'callback {callback.__name__} is unsubscribed from the event {event}')
+        return True
+
     def subscribe_keyboard(self, key: str, action: str, callback: Callable) -> bool:
         """ Subscribe to a certain keyboard event. 
         The key name of special keys be the same as pynput keycode: 
