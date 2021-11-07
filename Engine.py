@@ -12,11 +12,13 @@ from typing import Callable, Tuple
 import random
 from pynput import keyboard
 
-class Item(object):
+from BaseObject import BaseObject
+
+class Item(BaseObject):
     EVENT = ['enter', 'leave', 'timeout', 'removed']
 
-    def __init__(self, name, x, y, create_time, symbol='*', life=None, hidden=False) -> None:
-        super().__init__()
+    def __init__(self, name, x, y, create_time, symbol='*', life=None, hidden=False, debug=False) -> None:
+        super().__init__(debug)
         self.name = name
         self.x = x
         self.y = y
@@ -103,7 +105,7 @@ class Item(object):
         return True
 
 
-class Engine(object):
+class Engine(BaseObject):
     KB_EVENT = ['press', 'release']
     EVENT = []
     CONTROL_KEY = {
@@ -115,25 +117,28 @@ class Engine(object):
     }
 
     def __init__(self, width, height, move, debug=False) -> None:
-        super().__init__()
+        super().__init__(debug)
 
         self.width = width
         self.height = height
         self.move_cb = move
-        self.debug = debug
 
         self.character = [int(height/2), int(width/2)] # x, y
+        self.layer = 'map'
+        self.renderer = self.default_map_renderer
         self.map = [[None for _ in range(width)] for _ in range(height)]
+        self.backpack = ['apple']
         self.isend = False
 
         self._timestamp = 0
         self._kb_callback = {e: defaultdict(list) for e in self.KB_EVENT}
         self._subscription = {e: [] for e in self.EVENT}
+        self._layer_renderer = {'map': self.default_map_renderer}
         self._timer = {}
 
     def start(self) -> bool:
         while not self.isend:
-            self.render_map()
+            self.renderer(self)
             while not self._listen(): pass
             self._next()
 
@@ -152,9 +157,33 @@ class Engine(object):
         x, y = self.move_cb(direction, *self.position())
         self.position(x, y)
         self.log(f'move to {x}, {y}')
+        return
 
     # Map
-    def render_map(self) -> None:
+    def add_layer(self, name: str, renderer: Callable, switch = False, force_update = False) -> None:
+        if name in self._layer_renderer.keys():
+            self.log(f'layer {name} already exist. Renderer overridden.', 'warn')
+        
+        self._layer_renderer[name] = renderer
+        if switch or force_update:
+            self.layer = name
+            self.renderer = renderer
+        if force_update:
+            self.renderer()
+        return
+
+    def change_to_layer(self, name: str) -> bool:
+        if name not in self._layer_renderer.keys():
+            self.log(f'layer {name} is not avaliable', 'error')
+            self.log(f'available layer list: {str(list(self._layer_renderer.keys()))}', 'debug')
+            return False
+        
+        self.layer = name
+        self.renderer = self._layer_renderer[name]
+        self.log(f'switch to layer {self.layer} with handler {self.renderer.__name__}')
+        return True
+    
+    def default_map_renderer(self, *args) -> None:
         print()
         print(f'time: {self._timestamp:3}')
         print('.', '-' * self.width, '.', sep='')
@@ -182,7 +211,7 @@ class Engine(object):
             self.log('Symbol is automatically transformed into space', 'warn')
             symbol = ' '
 
-        new_item = Item(name, x, y, self._timestamp, symbol, life, hidden)
+        new_item = Item(name, x, y, self._timestamp, symbol, life, hidden, debug=self.debug)
 
         if self.map[x][y] is not None:
             self.log(f'Original item on ({x}, {y}) is replaced', 'warn')
@@ -274,36 +303,11 @@ class Engine(object):
         self._kb_callback[action][key].remove(callback)
         return True
     
-    def subscribe(self, event: str, callback: Callable) -> bool:
-        """ Subscribe to a global event.
-        Available event: 'movement'
-        """
-        # if event not in self.EVENT: 
-        #     self.log(f'action "{event}" not allowed. Callback not subscribed', 'warn')
-        #     self.log(f'Available actions: {self.EVENT}', 'warn')
-        #     return False
-        
-        # self._subscription[event].append(callback)
-        # return True
-        ...
-    
-    def unsubscribe(self, event: str, callback: Callable) -> bool:
-        """ Unsubscribe the first occurence of given callback """
-        # if event not in self.EVENT: 
-        #     self.log(f'event "{event}" not found', 'warn')
-        #     return False
-        # if callback not in self._kb_callback[event]:
-        #     self.log(f'callback {callback.__name__} not found', 'warn')
-        #     return False
-
-        # self._subscription[event].remove(callback)
-        # return True
-        ...
-    
     # utilities
     def _next(self) -> int:
         self._timestamp += 1
         self._check_event()
+        self.tik_timer()
         return self._timestamp
     
     def _cleanup(self) -> bool:
@@ -321,7 +325,7 @@ class Engine(object):
         flag = False
         action = type(event).__name__.lower()
 
-        if action == 'press' and event.key in self.CONTROL_KEY:
+        if self.layer == 'map' and action == 'press' and event.key in self.CONTROL_KEY:
             self.move(self.CONTROL_KEY[event.key])
             flag = True
         for cb in self._kb_callback[action][event.key]:
@@ -329,7 +333,7 @@ class Engine(object):
             flag = True
         return flag
     
-    def _check_event(self):
+    def _check_event(self) -> None:
         for rid, cid, item in self._get_items():
             if rid == self.character[0] and cid == self.character[1]:
                 item.fire('enter')
@@ -339,7 +343,6 @@ class Engine(object):
             alive = item.check_alive(self._timestamp)
             if not alive:
                 self._clean_tile(rid, cid)
-        self.tik_timer()
     
     def _get_tile(self, x: int, y: int) -> str:
         if x == self.character[0] and y == self.character[1]:
@@ -364,10 +367,3 @@ class Engine(object):
         """ For debugging """
         for row in self.map:
             self.log(row)
-
-    def log(self, message, level='debug') -> str:
-        if level.lower() == 'debug' and not self.debug: return
-
-        message = f'[ {level.upper()} ] {message}'
-        print(message)
-        return message
