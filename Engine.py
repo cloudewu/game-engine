@@ -17,7 +17,7 @@ from BaseObject import BaseObject
 class Item(BaseObject):
     EVENT = ['enter', 'leave', 'timeout', 'removed']
 
-    def __init__(self, name, x, y, create_time, symbol='*', life=None, hidden=False, debug=False) -> None:
+    def __init__(self, name, x, y, create_time, symbol='*', life=None, block=False, hidden=False, debug=False) -> None:
         super().__init__(debug)
         self.name = name
         self.x = x
@@ -25,6 +25,7 @@ class Item(BaseObject):
         self.created = create_time
         self.life = life
         self.symbol = symbol
+        self.block = block
         self.hidden = hidden
 
         self.istouched = False
@@ -159,6 +160,9 @@ class Engine(BaseObject):
 
     def move(self, direction) -> None:
         x, y = self.move_cb(direction, *self.position())
+        if self.map[x][y] and self.map[x][y].block:
+            self.log(f'block by item')
+            return
         self.position(x, y)
         self.log(f'move to {x}, {y}')
         return
@@ -205,7 +209,7 @@ class Engine(BaseObject):
         ...
 
     # Subscriber
-    def add_item(self, name: str, x: int, y: int, symbol: str, hidden: bool = False, life: int = None) -> Item:
+    def add_item(self, name: str, x: int, y: int, symbol: str, block: bool = False, hidden: bool = False, life: int = None) -> Item:
         if len(symbol) > 1:
             self.log(f'Item symbol can only be a single character. Received "{symbol}"', 'error')
             self.log(f'Item not added', 'warn')
@@ -215,7 +219,7 @@ class Engine(BaseObject):
             self.log('Symbol is automatically transformed into space', 'warn')
             symbol = ' '
 
-        new_item = Item(name, x, y, self._timestamp, symbol, life, hidden, debug=self.debug)
+        new_item = Item(name, x, y, self._timestamp, symbol, life, block, hidden, debug=self.debug)
 
         if self.map[x][y] is not None:
             self.log(f'Original item on ({x}, {y}) is replaced', 'warn')
