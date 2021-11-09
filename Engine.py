@@ -139,12 +139,14 @@ class Engine(BaseObject):
         self.layer = 'map'
         self.renderer = self._layer_renderer[self.layer]
 
-    def start(self) -> bool:
+    def start(self) -> int:
         self.fire('onstart')
         while not self.isend:
+            yield self._timestamp
             self.renderer(self)
             while not self._listen(): pass
             self._next()
+        yield None
 
     def end(self) -> None:
         self.isend = True

@@ -82,4 +82,6 @@ Game.subscribe_keyboard('b', 'press', lambda game: game.change_to_layer('backpac
 Game.subscribe_keyboard('m', 'press', lambda game: game.change_to_layer('map'))
 
 # MAIN
-Game.start()
+for day in Game.start():
+    print(f' *** Day {day} *** ')
+    
