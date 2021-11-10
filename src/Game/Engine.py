@@ -12,7 +12,7 @@ from typing import Callable, Tuple
 import random
 from pynput import keyboard
 
-from BaseObject import BaseObject
+from .BaseObject import BaseObject
 
 class Item(BaseObject):
     EVENT = ['enter', 'leave', 'timeout', 'removed']
