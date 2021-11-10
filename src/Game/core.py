@@ -115,14 +115,18 @@ class Engine(BaseObject):
     KB_EVENT = ['press', 'release']
     DEFAULT_EVENT = ['onstart', 'update_map', 'step_end', 'onend']
     CONTROL_KEY = {
-        keyboard.Key.up: 'up', 
-        keyboard.Key.down: 'down', 
-        keyboard.Key.right: 'right', 
-        keyboard.Key.left: 'left',
+        # default key for stdin
         'w': 'up',
         's': 'down',
         'a': 'left',
-        'd': 'right'
+        'd': 'right',
+        # default key for pynput
+        **({
+            keyboard.Key.up: 'up', 
+            keyboard.Key.down: 'down', 
+            keyboard.Key.right: 'right', 
+            keyboard.Key.left: 'left'
+        } if PYNPUT_AVAILABLE else {})
     }
 
     def __init__(self, width, height, move_function, input = None, map_renderer = None, debug = False) -> None:
@@ -149,6 +153,7 @@ class Engine(BaseObject):
         if not self.input:
             self.input = 'pynput' if PYNPUT_AVAILABLE else 'stdin'
             self.log(f'Autodetect input system: {self.input}')
+        self.log(self.CONTROL_KEY)
 
     def start(self) -> int:
         """ Start the game loop. 
@@ -372,24 +377,25 @@ class Engine(BaseObject):
         return True
 
     def subscribe_keyboard(self, key: str, action: str, callback: Callable) -> bool:
-        """ Subscribe to a certain keyboard event. 
-        The key name of special keys be the same as pynput keycode: 
+        """ Subscribe to a certain keyboard event.  
+        If stdin is used, the event will be subscribed to the exact string input ('esc' string, rather than `Esc` key);  
+        or if pynput is used, the event will be bound to a single keypress (`Esc` key).  
+        The key name of special keys be the same as pynput keycode if pynput is used: 
           https://pynput.readthedocs.io/en/stable/keyboard.html?highlight=key#pynput.keyboard.Key
         """
         if self.input == 'stdin': # only press is available for stdin
             action = 'press'
+        elif key in keyboard.Key._member_names_:
+            key = itemgetter(key)(keyboard.Key)
+        else:
+            key = keyboard.KeyCode.from_char(key)
 
         if action not in self.KB_EVENT: 
             self.log(f'action "{action}" not allowed. Callback not subscribed', 'warn')
             self.log(f'Available actions: {self.KB_EVENT}', 'warn')
             return False
 
-        if key in keyboard.Key._member_names_:
-            vkey = itemgetter(key)(keyboard.Key)
-        else:
-            vkey = keyboard.KeyCode.from_char(key)
-        self._kb_callback[action][key].append(callback) # stdin
-        self._kb_callback[action][vkey].append(callback) # pynput
+        self._kb_callback[action][key].append(callback)
         self.log(f'event "{action} {key}" subscribed')
         return True
 
@@ -397,6 +403,10 @@ class Engine(BaseObject):
         """ Unsubscribe the first occurence of given callback """
         if self.input == 'stdin': # only press is available for stdin
             action = 'press'
+        elif key in keyboard.Key._member_names_:
+            key = itemgetter(key)(keyboard.Key)
+        else:
+            key = keyboard.KeyCode.from_char(key)
 
         if action not in self.KB_EVENT: 
             self.log(f'action "{action}" not found', 'warn')
@@ -405,12 +415,7 @@ class Engine(BaseObject):
             self.log(f'callback {callback.__name__} not found', 'warn')
             return False
         
-        if key in keyboard.Key._member_names_:
-            vkey = itemgetter(key)(keyboard.Key)
-        else:
-            vkey = keyboard.KeyCode.from_char(key)
         self._kb_callback[action][key].remove(callback) # stdin
-        self._kb_callback[action][vkey].remove(callback) # pynput
         self.log(f'event "{action} {key}" unsubscribed')
         return True
     
