@@ -80,6 +80,9 @@ game.subscribe('itemfound', lambda game: print('*** An item is found!! ***'))
 game.subscribe_keyboard('esc', 'press', lambda game: game.end())
 game.subscribe_keyboard('b', 'press', lambda game: game.change_to_layer('backpack'))
 game.subscribe_keyboard('m', 'press', lambda game: game.change_to_layer('map'))
+def test(game): print('Testing keyboard :DD')
+game.subscribe_keyboard('t', 'press', test)
+game.unsubscribe_keyboard('t', 'press', test)
 
 # MAIN
 for day in game.start():

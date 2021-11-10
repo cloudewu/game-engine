@@ -10,9 +10,13 @@ from operator import itemgetter
 from collections import defaultdict
 from typing import Callable, Tuple
 import random
-from pynput import keyboard
+PYNPUT_AVAILABLE = True
+try:
+    from pynput import keyboard
+except ImportError:
+    PYNPUT_AVAILABLE = False
 
-from .BaseObject import BaseObject
+from .base import BaseObject
 
 class Item(BaseObject):
     EVENT = ['enter', 'leave', 'timeout', 'removed']
@@ -109,21 +113,25 @@ class Item(BaseObject):
 
 class Engine(BaseObject):
     KB_EVENT = ['press', 'release']
-    DEFAULT_EVENT = ['onstart', 'update_map', 'new_step', 'onend']
+    DEFAULT_EVENT = ['onstart', 'update_map', 'step_end', 'onend']
     CONTROL_KEY = {
-        # Make sure you know what you are doing when changing these properties 
         keyboard.Key.up: 'up', 
         keyboard.Key.down: 'down', 
         keyboard.Key.right: 'right', 
-        keyboard.Key.left: 'left'
+        keyboard.Key.left: 'left',
+        'w': 'up',
+        's': 'down',
+        'a': 'left',
+        'd': 'right'
     }
 
-    def __init__(self, width, height, move_function, map_renderer = None, debug=False) -> None:
+    def __init__(self, width, height, move_function, input = None, map_renderer = None, debug = False) -> None:
         super().__init__(debug)
 
         self.width = width
         self.height = height
         self.move_cb = move_function
+        self.input = input
 
         self.character = [int(height/2), int(width/2)] # x, y
         self.map = [[None for _ in range(width)] for _ in range(height)]
@@ -138,8 +146,20 @@ class Engine(BaseObject):
 
         self.layer = 'map'
         self.renderer = self._layer_renderer[self.layer]
+        if not self.input:
+            self.input = 'pynput' if PYNPUT_AVAILABLE else 'stdin'
+            self.log(f'Autodetect input system: {self.input}')
 
     def start(self) -> int:
+        """ Start the game loop. 
+        The current timestamp is yielded in real-time, right before rendering the map.  
+        The game loop is:
+        1. announce current timestamp (yield)
+        2. render the map
+        3. listen to any events and handle valid ones
+        4. fire `end_step` event
+        5. back to (1)
+        """
         self.fire('onstart')
         while not self.isend:
             yield self._timestamp
@@ -149,13 +169,19 @@ class Engine(BaseObject):
         yield None
 
     def end(self) -> None:
+        """ End the game immediately """
         self.isend = True
         self.fire('onend')
         self._cleanup()
         return True
 
-    # Movement
+    ### ------ MOVEMENT FUNCTIONALITIES ------ ###
+
     def position(self, x: int = None, y: int = None) -> Tuple[int,int]:
+        """ Get or set the character's position.
+        @return character's position after updated.
+        """
+        # [TODO] multiple characters
         if x is not None: self.character[0] = x
         if y is not None: self.character[1] = y
         return self.character[:]
@@ -169,8 +195,15 @@ class Engine(BaseObject):
         self.log(f'move to {x}, {y}')
         return
 
-    # Map
+    ### ------ MAP FUNCTIONALITIES ------ ###
+
     def add_layer(self, name: str, renderer: Callable, switch = False, force_update = False) -> None:
+        """ Add a new layer of the game.
+        @param name - the name of new layer
+        @param renderer - the render function of this layer
+        @param switch - whether to switch to this layer immediately after it's created
+        @param force_update - whether to force the engine render re-render current layer immediately
+        """
         if name in self._layer_renderer.keys():
             self.log(f'layer {name} already exist. Renderer overridden.', 'warn')
         
@@ -183,6 +216,9 @@ class Engine(BaseObject):
         return
 
     def change_to_layer(self, name: str) -> bool:
+        """
+        @return `true` if the switching is successful.
+        """
         if name not in self._layer_renderer.keys():
             self.log(f'layer {name} is not avaliable', 'error')
             self.log(f'available layer list: {str(list(self._layer_renderer.keys()))}', 'debug')
@@ -206,12 +242,15 @@ class Engine(BaseObject):
         print('\'', '-' * self.width, '\'', sep='')
         return
 
-    def update_map(self) -> bool:
+    def update_map(self, items) -> bool:
+        """ Update a selection of tiles at once """
         # [ TODO ]
         ...
 
-    # Subscriber
     def add_item(self, name: str, x: int, y: int, symbol: str, block: bool = False, hidden: bool = False, life: int = None) -> Item:
+        """ Add an item (tile) on to the map.
+        @return created `Item` object
+        """
         if len(symbol) > 1:
             self.log(f'Item symbol can only be a single character. Received "{symbol}"', 'error')
             self.log(f'Item not added', 'warn')
@@ -232,6 +271,9 @@ class Engine(BaseObject):
         return new_item
     
     def remove_item(self, x: int = None, y: int = None, name: str = None) -> bool:
+        """
+        @return `true` if an item is removed.
+        """
         if (x or y) and not (x and y):
             self.log(f'(x, y) should be specified at the same time', 'error')
             return False
@@ -256,12 +298,17 @@ class Engine(BaseObject):
         return flag
 
     def timer(self, time: int, callback: Callable) -> int:
+        """
+        @return timer id
+        """
         id = random.randint(1000, 10000)
-        self.log(f'timer {id} is added')
         self._timer[id] = [time, callback]
+        self.log(f'timer {id} is added')
         return id
 
     def tik_timer(self) -> None:
+        """ Check existing timers """
+        # [TODO-REFACT]
         dead = []
         for id, obj in self._timer.items():
             obj[0] -= 1
@@ -272,12 +319,17 @@ class Engine(BaseObject):
             self.remove_timer(id)
     
     def remove_timer(self, id: int) -> bool:
+        """
+        @return `true` if the timer is successfully removed.
+        """
         if id not in self._timer:
             self.log(f'timer {id} not found ({self.name})', 'warn')
             return False
         del self._timer[id]
-        print(id, self._timer)
+        self.log(f'timer {id} is removed')
         return True
+
+    ### ------ EVENT FUNCTIONALITIES ------ ###
 
     def fire(self, event: str, *args) -> bool:
         if event not in self._subscription.keys():
@@ -324,51 +376,93 @@ class Engine(BaseObject):
         The key name of special keys be the same as pynput keycode: 
           https://pynput.readthedocs.io/en/stable/keyboard.html?highlight=key#pynput.keyboard.Key
         """
+        if self.input == 'stdin': # only press is available for stdin
+            action = 'press'
+
         if action not in self.KB_EVENT: 
             self.log(f'action "{action}" not allowed. Callback not subscribed', 'warn')
             self.log(f'Available actions: {self.KB_EVENT}', 'warn')
             return False
 
         if key in keyboard.Key._member_names_:
-            key = itemgetter(key)(keyboard.Key)
+            vkey = itemgetter(key)(keyboard.Key)
         else:
-            key = keyboard.KeyCode.from_char(key)
-        self._kb_callback[action][key].append(callback)
+            vkey = keyboard.KeyCode.from_char(key)
+        self._kb_callback[action][key].append(callback) # stdin
+        self._kb_callback[action][vkey].append(callback) # pynput
         self.log(f'event "{action} {key}" subscribed')
         return True
 
     def unsubscribe_keyboard(self, key: str, action: str, callback: Callable) -> bool:
         """ Unsubscribe the first occurence of given callback """
+        if self.input == 'stdin': # only press is available for stdin
+            action = 'press'
+
         if action not in self.KB_EVENT: 
             self.log(f'action "{action}" not found', 'warn')
             return False
         if callback not in self._kb_callback[action][key]:
             self.log(f'callback {callback.__name__} not found', 'warn')
             return False
-
-        self._kb_callback[action][key].remove(callback)
+        
+        if key in keyboard.Key._member_names_:
+            vkey = itemgetter(key)(keyboard.Key)
+        else:
+            vkey = keyboard.KeyCode.from_char(key)
+        self._kb_callback[action][key].remove(callback) # stdin
+        self._kb_callback[action][vkey].remove(callback) # pynput
+        self.log(f'event "{action} {key}" unsubscribed')
         return True
     
-    # utilities
+    ### ------ UTILITIES ------ ###
+
     def _next(self) -> int:
+        """ Called when a step ends """
         self._timestamp += 1
         self._check_event()
         self.tik_timer()
-        self.fire('new_step')
+        self.fire('step_end')
         return self._timestamp
     
     def _cleanup(self) -> bool:
+        """ Called after the game ends """
         print('\n - end - \n')
         return True
     
     def _listen(self) -> bool:
-        with keyboard.Events() as events:
-            event = events.get()
-            self.log('Received event {}'.format(event))
-            updated = self._handle_keyboard(event)
+        """ 
+        Listen to user action and map events to corresponding handlers.
+        @return `True` if a valid event is detected.
+        """
+        updated = None
+        if self.input == 'pynput':
+            with keyboard.Events() as events:
+                event = events.get()
+                self.log('Received event {} (pynput)'.format(event))
+                updated = self._handle_keyboard(event)
+        elif self.input == 'stdin':
+            event = input().lower()
+            self.log('Received input {} (stdin)'.format(event))
+            updated = self._handle_stdin(event)
+        else:
+            self.log(f'Selected input system {self.input} not supported.', 'error')
+            self.end()
         return updated
 
+    def _handle_stdin(self, key: str) -> bool:
+        """ Handle events from standard input """
+        flag = False
+        if self.layer == 'map' and key in self.CONTROL_KEY:
+            self.move(self.CONTROL_KEY[key])
+            flag = True
+
+        for cb in self._kb_callback['press'][key]:
+            cb(self)
+            flag = True
+        return flag
+
     def _handle_keyboard(self, event) -> bool:
+        """ Handle events from pynput """
         flag = False
         action = type(event).__name__.lower()
 
@@ -381,6 +475,7 @@ class Engine(BaseObject):
         return flag
     
     def _check_event(self) -> None:
+        """ Check global events, including timers, item events, etc. """
         for rid, cid, item in self._get_items():
             if rid == self.character[0] and cid == self.character[1]:
                 item.fire('enter')
@@ -392,17 +487,26 @@ class Engine(BaseObject):
                 self._clean_tile(rid, cid)
     
     def _get_tile(self, x: int, y: int) -> str:
+        """ Get the tile symbol of a certain position """
         if x == self.character[0] and y == self.character[1]:
             return 'x'
         item = self.map[x][y]
         return item.symbol if item and not item.hidden else ' '
     
     def _get_items(self) -> Tuple[int,int,Item]:
+        """
+        Yield all existing items.
+        @return (x, y, item)
+        """
         for rid, row in enumerate(self.map):
             for cid, item in enumerate(row):
                 if item: yield rid, cid, item
     
     def _clean_tile(self, x: int, y: int) -> bool:
+        """
+        Remove the item on a certain tile
+        @return `true` if an item is removed
+        """
         item = self.map[x][y]
         if not item: return False
         item.fire('removed')
@@ -411,6 +515,6 @@ class Engine(BaseObject):
         return True
     
     def _print_map(self):
-        """ For debugging """
+        """ Print all objects on the map array. Just for debugging """
         for row in self.map:
             self.log(row)

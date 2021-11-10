@@ -1,6 +1,6 @@
 # dist
 dist/
-*.egg-info/
+**/*.egg-info/
 
 # cache file
 .DS_Store
