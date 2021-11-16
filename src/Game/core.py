@@ -1,11 +1,3 @@
-"""
-[Map]
-x/y 0 -> 1
-0
-v
-1
-"""
-
 from operator import itemgetter
 from collections import defaultdict
 from typing import Callable, Tuple
