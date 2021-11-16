@@ -192,6 +192,7 @@ class Engine(BaseObject):
         self.character = [int(height/2), int(width/2)] # current position of the character [x, y]
         self.map = [[None for _ in range(width)]       # map information
                           for _ in range(height)]
+        self.backpack = []                             # small backpack
         self.isend = False                             # whether the game has ended
 
         self._timestamp = 0
