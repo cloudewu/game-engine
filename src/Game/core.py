@@ -64,6 +64,11 @@ class Item(BaseObject):
         self.hidden = not flag
         return
 
+    def set_block(self, flag: bool = True) -> None:
+        """ Set whether the item should block user or not """
+        self.block = not flag
+        return
+    
     ### ------ EVENT FUNCTIONALITIES ------ ###
     
     def fire(self, action: str, *args) -> bool:
@@ -279,10 +284,10 @@ class Engine(BaseObject):
             self.renderer()
         return
 
-    def switch_layer(self, name: str, trigger: bool = False) -> bool:
+    def switch_layer(self, name: str, force_update: bool = False) -> bool:
         """ Change to another layer.
         @param name - the name of target layer
-        @param trigger - whether to check for event immediately after switching the layer
+        @param force_update - whether to re-render the map immediately.
         @return `true` if the switching is successful.
         """
         if name not in self._layer_renderer:
@@ -293,6 +298,9 @@ class Engine(BaseObject):
         self.layer = name
         self.renderer = self._layer_renderer[name]
         self.log(f'switch to layer {self.layer} with handler {self.renderer.__name__}')
+
+        if force_update:
+            self.renderer()
         return True
     
     def default_map_renderer(self, *args) -> None:
