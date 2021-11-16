@@ -22,15 +22,31 @@ class Item(BaseObject):
     EVENT = ['enter', 'leave', 'timeout', 'removed']
 
     def __init__(self, name, x, y, create_time, symbol='*', life=None, block=False, hidden=False, debug=False) -> None:
+        """ Create a new item/tile on the map.
+        @param name - the name of this item. 
+                      Can be used to remove certain type of tiles on the map.
+        @param x - current x position of the item
+        @param y - current y position of the item
+        @param create_time - timestamp of when this item is created
+        @param symbol - what to show on the map
+        @param life - how long will this item exists. 
+                      Once its life ends, the item will be removed automatically.
+        @param block - whether this item should block user's movement.
+        @param hidden - whether this item should be shown on the map. 
+                        Note that all events are still triggered even if the item is hidden.
+        @param debug - whether to print the debugging messages. 
+                       (warnings and errors will always be printed)
+        """
         super().__init__(debug)
-        self.name = name
-        self.x = x
-        self.y = y
-        self.created = create_time
-        self.life = life
-        self.symbol = symbol
-        self.block = block
-        self.hidden = hidden
+
+        self.name = name           # name of this item
+        self.x = x                 # current position of the item
+        self.y = y                 # current position of the item
+        self.created = create_time # when was this item created
+        self.life = life           # how long will this item exists
+        self.symbol = symbol       # what to show on the map
+        self.block = block         # whether to block user's movement
+        self.hidden = hidden       # whether to show on the map
 
         self.istouched = False
 
@@ -38,54 +54,22 @@ class Item(BaseObject):
         self._timer = {}
     
     def position(self) -> list:
+        """ Get current position of this item. """
         return [self.x, self.y]
     
     def show(self, flag: bool = True) -> None:
+        """ Set whether the item should be shown in the map or not.
+        Note that all events are still triggered even if the item is hidden.
+        """
         self.hidden = not flag
         return
-    
-    def add_event(self, action: str, callback: Callable) -> bool:
-        if action not in self.EVENT:
-            self.log(f'action "{action}" not allowed. Event not registered', 'warn')
-            self.log(f'Available actions: {self.EVENT}', 'warn')
-            return False
-        
-        self._callback[action].append(callback)
-        return True
 
-    def remove_event(self, action: str, callback: Callable) -> bool:
-        if action not in self.EVENT:
-            self.log(f'action "{action}" not found', 'warn')
-            return False
-        if callback not in self._callback[action]:
-            self.log(f'callback {callback.__name__} not found', 'warn')
-            return False
-
-        self._callback[action].remove(callback)
-        return True
-    
-    def timer(self, time: int, callback: Callable) -> int:
-        id = random.randint(1000, 10000)
-        self._timer[id] = [time, callback]
-        return id
-
-    def tik_timer(self) -> None:
-        dead = []
-        for id, obj in self._timer.items():
-            obj[0] -= 1
-            if obj[0] <= 0:
-                dead.append(id)
-        for id in dead:
-            self.fire('timeout', id)
-    
-    def remove_timer(self, id: int) -> bool:
-        if id not in self._timer:
-            self.log(f'timer {id} not found ({self.name})', 'warn')
-            return False
-        del self._timer[id]
-        return True
+    ### ------ EVENT FUNCTIONALITIES ------ ###
     
     def fire(self, action: str, *args) -> bool:
+        """ Fire a certain event.
+        @return whether the event is successfully fired.
+        """
         if action not in self.EVENT:
             self.log(f'action "{action}" not exist. Event not fired', 'warn')
             return False
@@ -102,18 +86,80 @@ class Item(BaseObject):
             cb(self)
         return True
     
-    def check_alive(self, timestamp) -> bool:
-        """ Daily update """
+    def subscribe(self, action: str, callback: Callable) -> bool:
+        """ Subscribe to an event on this item. 
+        The callback will be triggered once the event is fired.
+        @return whether the callback is successfully subscribed.
+        """
+        if action not in self.EVENT:
+            self.log(f'action "{action}" not allowed. Event not registered', 'warn')
+            self.log(f'Available actions: {self.EVENT}', 'warn')
+            return False
+        
+        self._callback[action].append(callback)
+        return True
+
+    def unsubscribe(self, action: str, callback: Callable) -> bool:
+        """ Unsubscribe a certain function from an event of this item.
+        @return whether the event is successfully unsubscribed.
+        """
+        if action not in self.EVENT:
+            self.log(f'action "{action}" not found', 'warn')
+            return False
+        if callback not in self._callback[action]:
+            self.log(f'callback {callback.__name__} not found', 'warn')
+            return False
+
+        self._callback[action].remove(callback)
+        return True
+    
+    def timer(self, time: int, callback: Callable) -> int:
+        """ Set up a timer. The callback will be triggered once the time is out.
+        @return an timer id, which can be used to cancel the timer.
+        """
+        id = random.randint(1000, 10000)
+        self._timer[id] = [time, callback]
+        return id
+    
+    def remove_timer(self, id: int) -> bool:
+        """ Remove the existing timer.
+        @return whether the timer is successfully removed.
+        """
+        if id not in self._timer:
+            self.log(f'timer {id} not found ({self.name})', 'warn')
+            return False
+        del self._timer[id]
+        return True
+    
+
+    ### ------ UTILITIES ------ ###
+    
+    def _tik_timer(self) -> None:
+        dead = []
+        for id, obj in self._timer.items():
+            obj[0] -= 1
+            if obj[0] <= 0:
+                dead.append(id)
+        for id in dead:
+            self.fire('timeout', id)
+
+    def _check_alive(self, timestamp) -> bool:
+        """ Check for daily update and return its current status. 
+        Please do not call this function, or the whole timeline of this item might be broken.
+        """
         if self.life and (timestamp > self.created + self.life):
             self.hidden = True
             return False
-        self.tik_timer()
+        self._tik_timer()
         return True
 
 
 class Engine(BaseObject):
-    KB_EVENT = ['press', 'release']
-    DEFAULT_EVENT = ['onstart', 'update_map', 'step_end', 'onend']
+    # available keyboard events
+    KB_EVENT = ['press', 'release'] 
+    # default events
+    DEFAULT_EVENT = ['onstart', 'update_map', 'step_end', 'onend'] 
+    # default keymap of movement control
     CONTROL_KEY = {
         # default key for stdin
         'w': 'up',
@@ -130,6 +176,15 @@ class Engine(BaseObject):
     }
 
     def __init__(self, width, height, move_function, input = None, map_renderer = None, debug = False) -> None:
+        """
+        @param width - the width of the map
+        @param height - the height of the map
+        @param move_function - the movement controller `function(action, x, y) -> [x, y]` of the engine. 
+                               The return value will be the new position of the character.
+        @param input - input mode. [stdin, pynput]
+        @param map_renderer - the default map render function.
+        @param debug - whether to print the debug messages. (warnings and errors are always printed)
+        """
         super().__init__(debug)
 
         self.width = width
@@ -137,10 +192,10 @@ class Engine(BaseObject):
         self.move_cb = move_function
         self.input = input
 
-        self.character = [int(height/2), int(width/2)] # x, y
-        self.map = [[None for _ in range(width)] for _ in range(height)]
-        self.backpack = ['apple']
-        self.isend = False
+        self.character = [int(height/2), int(width/2)] # current position of the character [x, y]
+        self.map = [[None for _ in range(width)]       # map information
+                          for _ in range(height)]
+        self.isend = False                             # whether the game has ended
 
         self._timestamp = 0
         self._kb_callback = {e: defaultdict(list) for e in self.KB_EVENT}
@@ -148,26 +203,30 @@ class Engine(BaseObject):
         self._layer_renderer = {'map': map_renderer or self.default_map_renderer}
         self._timer = {}
 
-        self.layer = 'map'
-        self.renderer = self._layer_renderer[self.layer]
+        self.layer = 'map'                                 # current presenting layer
+        self.renderer = self._layer_renderer[self.layer]   # current renderer
         if not self.input:
             self.input = 'pynput' if PYNPUT_AVAILABLE else 'stdin'
             self.log(f'Autodetect input system: {self.input}')
-        self.log(self.CONTROL_KEY)
+        self.log(f'Input system {self.input} is used')
 
     def start(self) -> int:
         """ Start the game loop. 
         The current timestamp is yielded in real-time, right before rendering the map.  
-        The game loop is:
-        1. announce current timestamp (yield)
-        2. render the map
-        3. listen to any events and handle valid ones
-        4. fire `end_step` event
-        5. back to (1)
+        The logic loop of the game is:
+         1. announce current timestamp (yield)
+         2. render the map
+         3. listen to any events and handle valid ones
+         4. fire `end_step` event
+         5. back to (1)
+        Note that your code in game loop will be processed in between (1) and (2).
         """
         self.fire('onstart')
         while not self.isend:
-            yield self._timestamp
+            yield self._timestamp 
+
+            # YOUR CODE IN THE LOOP WILL BE PUT RIGHT HERE
+
             self.renderer(self)
             while not self._listen(): pass
             self._next()
@@ -203,13 +262,13 @@ class Engine(BaseObject):
     ### ------ MAP FUNCTIONALITIES ------ ###
 
     def add_layer(self, name: str, renderer: Callable, switch = False, force_update = False) -> None:
-        """ Add a new layer of the game.
+        """ Add a new layer in the game.
         @param name - the name of new layer
         @param renderer - the render function of this layer
         @param switch - whether to switch to this layer immediately after it's created
         @param force_update - whether to force the engine render re-render current layer immediately
         """
-        if name in self._layer_renderer.keys():
+        if name in self._layer_renderer:
             self.log(f'layer {name} already exist. Renderer overridden.', 'warn')
         
         self._layer_renderer[name] = renderer
@@ -220,11 +279,13 @@ class Engine(BaseObject):
             self.renderer()
         return
 
-    def change_to_layer(self, name: str) -> bool:
-        """
+    def switch_layer(self, name: str, trigger: bool = False) -> bool:
+        """ Change to another layer.
+        @param name - the name of target layer
+        @param trigger - whether to check for event immediately after switching the layer
         @return `true` if the switching is successful.
         """
-        if name not in self._layer_renderer.keys():
+        if name not in self._layer_renderer:
             self.log(f'layer {name} is not avaliable', 'error')
             self.log(f'available layer list: {str(list(self._layer_renderer.keys()))}', 'debug')
             return False
@@ -235,6 +296,9 @@ class Engine(BaseObject):
         return True
     
     def default_map_renderer(self, *args) -> None:
+        """ The default renderer.  
+        If your renderer somehow is broken, try to set Engine.renderer back to this.
+        """
         print()
         print(f'time: {self._timestamp:3}')
         print('.', '-' * self.width, '.', sep='')
@@ -248,12 +312,22 @@ class Engine(BaseObject):
         return
 
     def update_map(self, items) -> bool:
-        """ Update a selection of tiles at once """
+        """ [ NOT IMPLEMENTED ] Update a selection of tiles at once """
         # [ TODO ]
-        ...
+        raise NotImplementedError
 
     def add_item(self, name: str, x: int, y: int, symbol: str, block: bool = False, hidden: bool = False, life: int = None) -> Item:
         """ Add an item (tile) on to the map.
+        @param name - the name of this item. 
+                      Can be used to remove certain type of tiles on the map.
+        @param x - current x position of the item
+        @param y - current y position of the item
+        @param symbol - what to show on the map
+        @param block - whether this item should block user's movement.
+        @param hidden - whether this item should be shown on the map. 
+                        Note that all events are still triggered even if the item is hidden.
+        @param life - how long will this item exists. 
+                      Once its life ends, the item will be removed automatically.
         @return created `Item` object
         """
         if len(symbol) > 1:
@@ -276,7 +350,10 @@ class Engine(BaseObject):
         return new_item
     
     def remove_item(self, x: int = None, y: int = None, name: str = None) -> bool:
-        """
+        """ Remove an existing item on the map.
+        If only the name is specified, all items with the given name will be removed.
+        If only the x and y are specified, the item on the given position will b removed.
+        If all x, y, and name are specified, the item will only be removed if it is on (x, y) and has the same name.
         @return `true` if an item is removed.
         """
         if (x or y) and not (x and y):
@@ -302,41 +379,12 @@ class Engine(BaseObject):
                 flag = True
         return flag
 
-    def timer(self, time: int, callback: Callable) -> int:
-        """
-        @return timer id
-        """
-        id = random.randint(1000, 10000)
-        self._timer[id] = [time, callback]
-        self.log(f'timer {id} is added')
-        return id
-
-    def tik_timer(self) -> None:
-        """ Check existing timers """
-        # [TODO-REFACT]
-        dead = []
-        for id, obj in self._timer.items():
-            obj[0] -= 1
-            if obj[0] <= 0:
-                obj[1](self)
-                dead.append(id)
-        for id in dead:
-            self.remove_timer(id)
-    
-    def remove_timer(self, id: int) -> bool:
-        """
-        @return `true` if the timer is successfully removed.
-        """
-        if id not in self._timer:
-            self.log(f'timer {id} not found ({self.name})', 'warn')
-            return False
-        del self._timer[id]
-        self.log(f'timer {id} is removed')
-        return True
-
     ### ------ EVENT FUNCTIONALITIES ------ ###
 
     def fire(self, event: str, *args) -> bool:
+        """ Fire a certain event.
+        @return whether the event is successfully fired.
+        """
         if event not in self._subscription.keys():
             self.log(f'event "{event}" not exist. Event not fired', 'warn')
             return False
@@ -346,6 +394,10 @@ class Engine(BaseObject):
         return True
 
     def add_event(self, name: str) -> bool:
+        """ Register a new event onto the engine. 
+        After adding the event, you can now subcribe to your custom event through `subscribe` function.
+        @return `true` if the event is successfully registered.
+        """
         if name in self._subscription.keys():
             self.log(f'event {name} already existed.', 'warn')
             return False
@@ -355,6 +407,10 @@ class Engine(BaseObject):
         return True
     
     def subscribe(self, event: str, callback: Callable) -> bool:
+        """ Subscribe a callback to an event on this item. 
+        The callback will be triggered once the event is fired.
+        @return whether the callback is successfully subscribed.
+        """
         if event not in self._subscription.keys():
             self.log(f'Event "{event}" not exists. Callback not subscribed', 'warn')
             self.log(f'Available events: {list(self._subscription.keys())}', 'warn')
@@ -365,6 +421,10 @@ class Engine(BaseObject):
         return True
 
     def unsubscribe(self, event: str, callback: Callable) -> bool:
+        """ Unsubscribe a certain function from the given event.
+        If the callback has been registered for multiple times, only the first occurence will be removed.
+        @return whether the event is successfully unsubscribed.
+        """
         if event not in self._subscription.keys():
             self.log(f'event "{event}" not found', 'warn')
             return False
@@ -376,47 +436,71 @@ class Engine(BaseObject):
         self.log(f'callback {callback.__name__} is unsubscribed from the event {event}')
         return True
 
-    def subscribe_keyboard(self, key: str, action: str, callback: Callable) -> bool:
+    def subscribe_keyboard(self, key: str, event: str, callback: Callable) -> bool:
         """ Subscribe to a certain keyboard event.  
         If stdin is used, the event will be subscribed to the exact string input ('esc' string, rather than `Esc` key);  
         or if pynput is used, the event will be bound to a single keypress (`Esc` key).  
         The key name of special keys be the same as pynput keycode if pynput is used: 
           https://pynput.readthedocs.io/en/stable/keyboard.html?highlight=key#pynput.keyboard.Key
+        @return `true` if the callback is successfully subscribed.
         """
         if self.input == 'stdin': # only press is available for stdin
-            action = 'press'
+            event = 'press'
         elif key in keyboard.Key._member_names_:
             key = itemgetter(key)(keyboard.Key)
         else:
             key = keyboard.KeyCode.from_char(key)
 
-        if action not in self.KB_EVENT: 
-            self.log(f'action "{action}" not allowed. Callback not subscribed', 'warn')
+        if event not in self.KB_EVENT: 
+            self.log(f'action "{event}" not allowed. Callback not subscribed', 'warn')
             self.log(f'Available actions: {self.KB_EVENT}', 'warn')
             return False
 
-        self._kb_callback[action][key].append(callback)
-        self.log(f'event "{action} {key}" subscribed')
+        self._kb_callback[event][key].append(callback)
+        self.log(f'event "{event} {key}" subscribed')
         return True
 
-    def unsubscribe_keyboard(self, key: str, action: str, callback: Callable) -> bool:
-        """ Unsubscribe the first occurence of given callback """
+    def unsubscribe_keyboard(self, key: str, event: str, callback: Callable) -> bool:
+        """ Unsubscribe a certain callback from the event of the given key .
+        If the callback has been registered for multiple times, only the first occurence will be removed.
+        @return `true` if the callback is successfully unsubscribed.
+        """
         if self.input == 'stdin': # only press is available for stdin
-            action = 'press'
+            event = 'press'
         elif key in keyboard.Key._member_names_:
             key = itemgetter(key)(keyboard.Key)
         else:
             key = keyboard.KeyCode.from_char(key)
 
-        if action not in self.KB_EVENT: 
-            self.log(f'action "{action}" not found', 'warn')
+        if event not in self.KB_EVENT: 
+            self.log(f'action "{event}" not found', 'warn')
             return False
-        if callback not in self._kb_callback[action][key]:
+        if callback not in self._kb_callback[event][key]:
             self.log(f'callback {callback.__name__} not found', 'warn')
             return False
         
-        self._kb_callback[action][key].remove(callback) # stdin
-        self.log(f'event "{action} {key}" unsubscribed')
+        self._kb_callback[event][key].remove(callback) # stdin
+        self.log(f'event "{event} {key}" unsubscribed')
+        return True
+
+    def timer(self, time: int, callback: Callable) -> int:
+        """ Set up a timer. The callback will be triggered once the time is out.
+        @return an timer id, which can be used to cancel the timer.
+        """
+        id = random.randint(1000, 10000)
+        self._timer[id] = [time, callback]
+        self.log(f'timer {id} is added')
+        return id
+
+    def remove_timer(self, id: int) -> bool:
+        """ Remove the existing timer.
+        @return whether the timer is successfully removed.
+        """
+        if id not in self._timer:
+            self.log(f'timer {id} not found ({self.name})', 'warn')
+            return False
+        del self._timer[id]
+        self.log(f'timer {id} is removed')
         return True
     
     ### ------ UTILITIES ------ ###
@@ -425,7 +509,7 @@ class Engine(BaseObject):
         """ Called when a step ends """
         self._timestamp += 1
         self._check_event()
-        self.tik_timer()
+        self._tik_timer()
         self.fire('step_end')
         return self._timestamp
     
@@ -487,9 +571,22 @@ class Engine(BaseObject):
             elif item.istouched:
                 item.fire('leave')
             
-            alive = item.check_alive(self._timestamp)
+            alive = item._check_alive(self._timestamp)
             if not alive:
                 self._clean_tile(rid, cid)
+    
+    def _tik_timer(self) -> None:
+        """ Check existing timers """
+        # [TODO-REFACT]
+        dead = []
+        for id, obj in self._timer.items():
+            obj[0] -= 1
+            if obj[0] <= 0:
+                obj[1](self)
+                dead.append(id)
+        for id in dead:
+            self.remove_timer(id)
+        return
     
     def _get_tile(self, x: int, y: int) -> str:
         """ Get the tile symbol of a certain position """

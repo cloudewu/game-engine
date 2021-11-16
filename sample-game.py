@@ -54,23 +54,23 @@ item = game.add_item('dollar',       # item name
                      life = 10       # how many rounds should the item be automatically removed
                      )
 item.timer(5, lambda i: i.show(True)) # show the item after 5 rounds
-item.add_event('removed', lambda i: print('*** (1) I am removed qq ***'))
-item.add_event('enter', lambda i: print('*** You found me! ***'))
-item.add_event('leave', lambda i: print('*** You leaved me qwq *** '))
+item.subscribe('removed', lambda i: print('*** (1) I am removed qq ***'))
+item.subscribe('enter', lambda i: print('*** You found me! ***'))
+item.subscribe('leave', lambda i: print('*** You leaved me qwq *** '))
 
 # DEMO: remove item by location
 item = game.add_item('star', 3, 20, '*')
-item.add_event('removed', lambda i: print('*** (2) I am removed qq ***'))
+item.subscribe('removed', lambda i: print('*** (2) I am removed qq ***'))
 game.remove_item(x = item.x, y = item.y)
 
 # DEMO: remove item by name
 item = game.add_item('star', 3, 20, '*')
-item.add_event('removed', lambda i: print('*** (3) I am removed qq ***'))
+item.subscribe('removed', lambda i: print('*** (3) I am removed qq ***'))
 game.remove_item(name = item.name)
 
 # DEMO: remove item by location and name (useful when you are lazy checking the current tile)
 item = game.add_item('star', 3, 20, '*')
-item.add_event('removed', lambda i: print('*** (4) I am removed qq ***'))
+item.subscribe('removed', lambda i: print('*** (4) I am removed qq ***'))
 game.remove_item(3, 30, name = 'not-star') # you should see that the item is not removed
 
 # DEMO: default events
