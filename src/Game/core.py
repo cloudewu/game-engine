@@ -207,6 +207,7 @@ class Engine(BaseObject):
         self._subscription = {e: [] for e in self.DEFAULT_EVENT}
         self._layer_renderer = {'map': map_renderer or self.default_map_renderer}
         self._timer = {}
+        self._pause_event_once = False
 
         self.layer = 'map'                                 # current presenting layer
         self.renderer = self._layer_renderer[self.layer]   # current renderer
@@ -284,10 +285,11 @@ class Engine(BaseObject):
             self.renderer()
         return
 
-    def switch_layer(self, name: str, force_update: bool = False) -> bool:
+    def switch_layer(self, name: str, force_update: bool = False, pause_event_check: bool = True) -> bool:
         """ Change to another layer.
         @param name - the name of target layer
         @param force_update - whether to re-render the map immediately.
+        @param pause_event_check - whether to pause the event check immediately after the layer switched.
         @return `true` if the switching is successful.
         """
         if name not in self._layer_renderer:
@@ -299,6 +301,7 @@ class Engine(BaseObject):
         self.renderer = self._layer_renderer[name]
         self.log(f'switch to layer {self.layer} with handler {self.renderer.__name__}')
 
+        self._pause_event_once = pause_event_check
         if force_update:
             self.renderer()
         return True
@@ -573,6 +576,11 @@ class Engine(BaseObject):
     
     def _check_event(self) -> None:
         """ Check global events, including timers, item events, etc. """
+        if self.layer is not 'map': return
+        if self._pause_event_once:
+            self._pause_event_once = False
+            return
+        
         for rid, cid, item in self._get_items():
             if rid == self.character[0] and cid == self.character[1]:
                 item.fire('enter')
