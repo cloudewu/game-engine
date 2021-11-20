@@ -13,7 +13,7 @@ from .base import BaseObject
 class Item(BaseObject):
     EVENT = ['enter', 'leave', 'timeout', 'removed']
 
-    def __init__(self, name, x, y, create_time, symbol='*', life=None, block=False, hidden=False, debug=False) -> None:
+    def __init__(self, name, x, y, create_time, symbol='*', life=None, block=False, hidden=False, debug=False, parent=None) -> None:
         """ Create a new item/tile on the map.
         @param name - the name of this item. 
                       Can be used to remove certain type of tiles on the map.
@@ -39,6 +39,7 @@ class Item(BaseObject):
         self.symbol = symbol       # what to show on the map
         self.block = block         # whether to block user's movement
         self.hidden = hidden       # whether to show on the map
+        self.parent = parent       # which game did this item come from
 
         self.istouched = False
 
@@ -343,7 +344,7 @@ class Engine(BaseObject):
             self.log('Symbol is automatically transformed into space', 'warn')
             symbol = ' '
 
-        new_item = Item(name, x, y, self._timestamp, symbol, life, block, hidden, debug=self.debug)
+        new_item = Item(name, x, y, self._timestamp, symbol, life, block, hidden, debug=self.debug, parent=self)
 
         if self.map[x][y] is not None:
             self.log(f'Original item on ({x}, {y}) is replaced', 'warn')
