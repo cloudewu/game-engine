@@ -58,7 +58,7 @@ class Item(BaseObject):
 
     def set_block(self, flag: bool = True) -> None:
         """ Set whether the item should block user or not """
-        self.block = not flag
+        self.block = flag
         return
     
     ### ------ EVENT FUNCTIONALITIES ------ ###
