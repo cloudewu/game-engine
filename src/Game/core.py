@@ -372,15 +372,13 @@ class Engine(BaseObject):
             if not self.map[x][y]:
                 return False
             if self.map[x][y].name == name: 
-                self._clean_tile[x][y]
-                return True
+                return self._clean_tile(x, y)
             return False
         
         flag = False
         for rid, cid, item in self._get_items():
             if item.name == name:
-                self._clean_tile(rid, cid)
-                flag = True
+                flag = self._clean_tile(rid, cid) or flag
         return flag
 
     ### ------ EVENT FUNCTIONALITIES ------ ###
