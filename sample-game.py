@@ -84,14 +84,15 @@ game.subscribe('itemfound', lambda game: print('*** An item is found!! ***'))
 
 # DEMO: keyboard events
 game.subscribe_keyboard('esc', 'press', lambda game: game.end())
-game.subscribe_keyboard('b', 'press', lambda game: game.change_to_layer('backpack'))
-game.subscribe_keyboard('m', 'press', lambda game: game.change_to_layer('map'))
+game.subscribe_keyboard('b', 'press', lambda game: game.switch_layer('backpack'))
+game.subscribe_keyboard('m', 'press', lambda game: game.switch_layer('map'))
 def test(game): print('Testing keyboard :DD')
 game.subscribe_keyboard('t', 'press', test)
 game.unsubscribe_keyboard('t', 'press', test)
 
-# MAIN
-for day in game.start():
+# DEMO: start the game
+session = game.start()
+for day in session:
     if day == None: break
     # do something between steps here (add timers, subscriptions, events...)
     print(f' *** Day {day} ends *** ')
