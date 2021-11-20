@@ -532,7 +532,7 @@ class Engine(BaseObject):
                 self.log('Received event {} (pynput)'.format(event))
                 updated = self._handle_keyboard(event)
         elif self.input == 'stdin':
-            event = input().lower()
+            event = input('input: ').lower()
             self.log('Received input {} (stdin)'.format(event))
             updated = self._handle_stdin(event)
         else:
