@@ -567,7 +567,7 @@ class Engine(BaseObject):
     
     def _check_event(self) -> None:
         """ Check global events, including timers, item events, etc. """
-        if self.layer is not 'map': return
+        if self.layer != 'map': return
         if self._pause_event_once:
             self._pause_event_once = False
             return
