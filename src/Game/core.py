@@ -517,7 +517,7 @@ class Engine(BaseObject):
     
     def _cleanup(self) -> bool:
         """ Called after the game ends """
-        print('\n - end - \n')
+        ## anything to do?
         return True
     
     def _listen(self) -> bool:
