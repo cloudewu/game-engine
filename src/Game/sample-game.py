@@ -30,6 +30,8 @@ def map_renderer(game):
 WIDTH, HEIGHT = 40, 10
 game = Engine(WIDTH, HEIGHT,     # The map size of your game
               move,              # The movement controller
+              # init_x = 0,      # initial x position of the character
+              # init_y = 1,      # initial y position of the character
               # input = 'stdin', # forcefully set the input system. 
                                  # Available options: [stdin, pynput (only if supported)]
               # map_renderer,    # write your own map renderer 

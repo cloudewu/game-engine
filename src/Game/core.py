@@ -173,13 +173,15 @@ class Engine(BaseObject):
         } if PYNPUT_AVAILABLE else {})
     }
 
-    def __init__(self, width, height, move_function, input = None, map_renderer = None, debug = False) -> None:
+    def __init__(self, width, height, move_function, init_x = None, init_y = None, input = None, map_renderer = None, debug = False) -> None:
         """
         @param width - the width of the map
         @param height - the height of the map
         @param move_function - the movement controller `function(action, x, y) -> [x, y]` of the engine. 
                                The return value will be the new position of the character.
         @param input - input mode. [stdin, pynput]
+        @param init_x - initial position x of the character
+        @param init_y - initial position y of the character
         @param map_renderer - the default map render function.
         @param debug - whether to print the debug messages. (warnings and errors are always printed)
         """
@@ -190,7 +192,9 @@ class Engine(BaseObject):
         self.move_cb = move_function
         self.input = input
 
-        self.character = [int(height/2), int(width/2)] # current position of the character [x, y]
+        # current position of the character [x, y]
+        self.character = [init_x if init_x is not None else int(height/2), 
+                          init_y if init_y is not None else int(width/2)]
         self.map = [[None for _ in range(width)]       # map information
                           for _ in range(height)]
         self.backpack = []                             # small backpack
