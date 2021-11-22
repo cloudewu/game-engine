@@ -385,6 +385,16 @@ class Engine(BaseObject):
             if item.name == name:
                 flag = self._clean_tile(rid, cid) or flag
         return flag
+    
+    def find_item(self, name = None, symbol = None):
+        result = []
+        for _, _, item in self._get_items():
+            if name and item.name != name:
+                continue
+            if symbol and item.symbol != symbol:
+                continue
+            result.append(item)
+        return result
 
     ### ------ EVENT FUNCTIONALITIES ------ ###
 
