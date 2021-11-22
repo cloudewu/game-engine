@@ -94,13 +94,17 @@ game.unsubscribe_keyboard('t', 'press', test)
 
 # DEMO: find item by properties
 game.add_item('star1', 2, 3, '*')
-game.add_item('star1', 2, 4, '*')
+game.add_item('star1', 2, 4, '*', hidden=True)
 game.add_item('star2', 2, 5, '*')
 game.add_item('star2', 1, 3, '&')
+game.add_item('block', 1, 2, '#', block=True)
 game.add_item('nil', 1, 2, '-')
+
 all_items = game.find_item()
-all_star1 = game.find_item(name = 'star1')
-all_star_symbols = game.find_item(symbol= '*')
+all_star1 = game.find_item(name='star1')
+all_star_symbols = game.find_item(symbol='*')
+all_blocked_item = game.find_item(block=True)
+all_shown_stars = game.find_item(symbol='*', hidden=False)
 
 # DEMO: start the game
 session = game.start()

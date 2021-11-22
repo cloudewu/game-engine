@@ -386,12 +386,20 @@ class Engine(BaseObject):
                 flag = self._clean_tile(rid, cid) or flag
         return flag
     
-    def find_item(self, name = None, symbol = None):
+    def find_item(self, name: str = None, symbol: str = None, hidden: bool = None, block: bool = None) -> list:
+        """ Find existing items that matches all given properties.  
+        Available properties: name, symbol, hidden, block.
+        @return - a list of matched items
+        """
         result = []
         for _, _, item in self._get_items():
-            if name and item.name != name:
+            if name is not None and item.name != name:
                 continue
-            if symbol and item.symbol != symbol:
+            if symbol is not None and item.symbol != symbol:
+                continue
+            if hidden is not None and item.hidden != hidden:
+                continue
+            if block is not None and item.block != block:
                 continue
             result.append(item)
         return result
