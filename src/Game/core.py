@@ -9,6 +9,7 @@ except ImportError:
     PYNPUT_AVAILABLE = False
 
 from .base import BaseObject
+from .util import hasnone, allnone
 
 class Item(BaseObject):
     EVENT = ['enter', 'leave', 'timeout', 'removed']
@@ -365,19 +366,22 @@ class Engine(BaseObject):
         If all x, y, and name are specified, the item will only be removed if it is on (x, y) and has the same name.
         @return `true` if an item is removed.
         """
-        if (x or y) and not (x and y):
+        if hasnone([x, y]) and not allnone([x, y]):
             self.log(f'(x, y) should be specified at the same time', 'error')
+            self.log(f'item not removed.', 'warn')
             return False
         
-        if x and not name:
+        if x is not None and name is None:
             self._clean_tile(x, y)
             return True
 
-        if x:
+        if x is not None:
             if not self.map[x][y]:
+                self.log(f'item on ({x}, {y}) not found')
                 return False
             if self.map[x][y].name == name: 
                 return self._clean_tile(x, y)
+            self.log(f'item on ({x}, {y}) is not "{name}"')
             return False
         
         flag = False
@@ -410,7 +414,7 @@ class Engine(BaseObject):
         """ Fire a certain event.
         @return whether the event is successfully fired.
         """
-        if event not in self._subscription.keys():
+        if event not in self._subscription:
             self.log(f'event "{event}" not exist. Event not fired', 'warn')
             return False
 
@@ -423,7 +427,7 @@ class Engine(BaseObject):
         After adding the event, you can now subcribe to your custom event through `subscribe` function.
         @return `true` if the event is successfully registered.
         """
-        if name in self._subscription.keys():
+        if name in self._subscription:
             self.log(f'event {name} already existed.', 'warn')
             return False
         
@@ -643,7 +647,7 @@ class Engine(BaseObject):
         if not item: return False
         item.fire('removed')
         self.map[x][y] = None
-        self.log(f'Item {item.name} is removed')
+        self.log(f'Item {item.name} on ({x}, {y}) is removed')
         return True
     
     def _print_map(self):
