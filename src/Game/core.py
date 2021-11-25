@@ -56,60 +56,65 @@ class Item(BaseObject):
         Note that all events are still triggered even if the item is hidden.
         """
         self.hidden = not flag
+        self.log(f'Item-{self.name}: set hidden to {self.hidden}')
         return
 
     def set_block(self, flag: bool = True) -> None:
         """ Set whether the item should block user or not """
         self.block = flag
+        self.log(f'Item-{self.name}: set block to {self.block}')
         return
     
     ### ------ EVENT FUNCTIONALITIES ------ ###
     
-    def fire(self, action: str, *args) -> bool:
+    def fire(self, event: str, *args) -> bool:
         """ Fire a certain event.
         @return whether the event is successfully fired.
         """
-        if action not in self.EVENT:
-            self.log(f'action "{action}" not exist. Event not fired', 'warn')
+        if event not in self.EVENT:
+            self.log(f'Item-{self.name}: event "{event}" doesn\'t exist. Event not fired', 'warn')
             return False
 
-        if action == 'timeout':
+        self.log(f'Item-{self.name}: fire "{event}" event')  
+        if event == 'timeout':
             self._timer[args[0]][1](self)
             del self._timer[args[0]]
-        elif action == 'enter':
+        elif event == 'enter':
             self.istouched = True
-        elif action == 'leave':
+        elif event == 'leave':
             self.istouched = False
 
-        for cb in self._callback[action]:
+        for cb in self._callback[event]:
             cb(self)
         return True
     
-    def subscribe(self, action: str, callback: Callable) -> bool:
+    def subscribe(self, event: str, callback: Callable) -> bool:
         """ Subscribe to an event on this item. 
         The callback will be triggered once the event is fired.
         @return whether the callback is successfully subscribed.
         """
-        if action not in self.EVENT:
-            self.log(f'action "{action}" not allowed. Event not registered', 'warn')
-            self.log(f'Available actions: {self.EVENT}', 'warn')
+        if event not in self.EVENT:
+            self.log(f'Item-{self.name}: event "{event}" not allowed. Event not registered', 'warn')
+            self.log(f'Item-{self.name}: Available events: {self.EVENT}', 'warn')
             return False
         
-        self._callback[action].append(callback)
+        self._callback[event].append(callback)
+        self.log(f'Item-{self.name}: callback {callback.__name__} subscribes to the event "{event}"')
         return True
 
-    def unsubscribe(self, action: str, callback: Callable) -> bool:
+    def unsubscribe(self, event: str, callback: Callable) -> bool:
         """ Unsubscribe a certain function from an event of this item.
         @return whether the event is successfully unsubscribed.
         """
-        if action not in self.EVENT:
-            self.log(f'action "{action}" not found', 'warn')
+        if event not in self.EVENT:
+            self.log(f'Item-{self.name}: event "{event}" not found', 'warn')
             return False
-        if callback not in self._callback[action]:
-            self.log(f'callback {callback.__name__} not found', 'warn')
+        if callback not in self._callback[event]:
+            self.log(f'Item-{self.name}: callback {callback.__name__} not found', 'warn')
             return False
 
-        self._callback[action].remove(callback)
+        self._callback[event].remove(callback)
+        self.log(f'Item-{self.name}: callback {callback.__name__} removed from the event "{event}"')
         return True
     
     def timer(self, time: int, callback: Callable) -> int:
@@ -118,6 +123,7 @@ class Item(BaseObject):
         """
         id = random.randint(1000, 10000)
         self._timer[id] = [time, callback]
+        self.log(f'Item-{self.name}: timer {id} is added. handler: {callback.__name__}')
         return id
     
     def remove_timer(self, id: int) -> bool:
@@ -125,9 +131,10 @@ class Item(BaseObject):
         @return whether the timer is successfully removed.
         """
         if id not in self._timer:
-            self.log(f'timer {id} not found ({self.name})', 'warn')
+            self.log(f'Item-{self.name}: timer {id} not found ({self.name})', 'warn')
             return False
         del self._timer[id]
+        self.log(f'Item-{self.name}: timer {id} is removed')
         return True
     
 
@@ -137,6 +144,7 @@ class Item(BaseObject):
         dead = []
         for id, obj in self._timer.items():
             obj[0] -= 1
+            self.log(f'Item-{self.name}: timer {id} remain time: {obj[0]}')
             if obj[0] <= 0:
                 dead.append(id)
         for id in dead:
@@ -258,10 +266,10 @@ class Engine(BaseObject):
     def move(self, direction) -> None:
         x, y = self.move_cb(direction, *self.position())
         if self.map[x][y] and self.map[x][y].block:
-            self.log(f'block by item')
+            self.log(f'blocked by item')
             return
         self.position(x, y)
-        self.log(f'move to {x}, {y}')
+        self.log(f'move to ({x}, {y})')
         return
 
     ### ------ MAP FUNCTIONALITIES ------ ###
@@ -277,6 +285,7 @@ class Engine(BaseObject):
             self.log(f'layer {name} already exist. Renderer overridden.', 'warn')
         
         self._layer_renderer[name] = renderer
+        self.log(f'layer {name} is added with renderer {renderer.__name__}')
         if switch or force_update:
             self.layer = name
             self.renderer = renderer
@@ -298,7 +307,7 @@ class Engine(BaseObject):
         
         self.layer = name
         self.renderer = self._layer_renderer[name]
-        self.log(f'switch to layer {self.layer} with handler {self.renderer.__name__}')
+        self.log(f'switch to layer {self.layer} with renderer {self.renderer.__name__}')
 
         self._pause_event_once = pause_event_check
         if force_update:
@@ -418,6 +427,7 @@ class Engine(BaseObject):
             self.log(f'event "{event}" not exist. Event not fired', 'warn')
             return False
 
+        self.log(f'event "{event}" is fired')
         for cb in self._subscription[event]:
             cb(self)
         return True
@@ -428,7 +438,7 @@ class Engine(BaseObject):
         @return `true` if the event is successfully registered.
         """
         if name in self._subscription:
-            self.log(f'event {name} already existed.', 'warn')
+            self.log(f'{name} already existed. event not added.', 'warn')
             return False
         
         self._subscription[name] = []
@@ -440,7 +450,7 @@ class Engine(BaseObject):
         The callback will be triggered once the event is fired.
         @return whether the callback is successfully subscribed.
         """
-        if event not in self._subscription.keys():
+        if event not in self._subscription:
             self.log(f'Event "{event}" not exists. Callback not subscribed', 'warn')
             self.log(f'Available events: {list(self._subscription.keys())}', 'warn')
             return False
@@ -454,7 +464,7 @@ class Engine(BaseObject):
         If the callback has been registered for multiple times, only the first occurence will be removed.
         @return whether the event is successfully unsubscribed.
         """
-        if event not in self._subscription.keys():
+        if event not in self._subscription:
             self.log(f'event "{event}" not found', 'warn')
             return False
         if callback not in self._subscription[event]:
@@ -615,6 +625,7 @@ class Engine(BaseObject):
         dead = []
         for id, obj in self._timer.items():
             obj[0] -= 1
+            self.log(f'timer {id} remain time: {obj[0]}')
             if obj[0] <= 0:
                 obj[1](self)
                 dead.append(id)
