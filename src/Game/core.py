@@ -1,6 +1,7 @@
 from operator import itemgetter
 from collections import defaultdict
 from typing import Callable, Tuple
+from urwid import str_util
 import random
 PYNPUT_AVAILABLE = True
 try:
@@ -182,16 +183,27 @@ class Engine(BaseObject):
         } if PYNPUT_AVAILABLE else {})
     }
 
-    def __init__(self, width, height, move_function, init_x = None, init_y = None, input = None, map_renderer = None, debug = False) -> None:
+    def __init__(self, width, height, 
+                 move_function, 
+                 init_x = None, init_y = None, 
+                 input = None, 
+                 pixel_width = 1, 
+                 character_char = 'x', 
+                 map_renderer = None, 
+                 map_filler = ' ',
+                 debug = False) -> None:
         """
         @param width - the width of the map
         @param height - the height of the map
         @param move_function - the movement controller `function(action, x, y) -> [x, y]` of the engine. 
                                The return value will be the new position of the character.
-        @param input - input mode. [stdin, pynput]
         @param init_x - initial position x of the character
         @param init_y - initial position y of the character
+        @param input - input mode. [stdin, pynput]
+        @param pixel_width - the width of every pixel. Set this if you're using emoji in the map.
+        @param character_char - the char used to resemble the character
         @param map_renderer - the default map render function.
+        @param map_filler - what to show if there's no item on the map.
         @param debug - whether to print the debug messages. (warnings and errors are always printed)
         """
         super().__init__(debug)
@@ -201,9 +213,12 @@ class Engine(BaseObject):
         self.move_cb = move_function
         self.input = input
 
+        self.pixel_width = pixel_width
+        self.character_char = character_char
         # current position of the character [x, y]
         self.character = [init_x if init_x is not None else int(height/2), 
                           init_y if init_y is not None else int(width/2)]
+        self.map_filler = map_filler
         self.map = [[None for _ in range(width)]       # map information
                           for _ in range(height)]
         self.backpack = []                             # small backpack
@@ -320,14 +335,14 @@ class Engine(BaseObject):
         """
         print()
         print(f'time: {self._timestamp:3}')
-        print('.', '-' * self.width, '.', sep='')
+        print('.', '-' * self.width * self.pixel_width, '.', sep='')
         for i in range(self.height):
             print('|', end='')
             for j in range(self.width):
                 symbol = self._get_tile(i, j)
                 print(symbol, end='')
             print('|')
-        print('\'', '-' * self.width, '\'', sep='')
+        print('\'', '-' * self.width * self.pixel_width, '\'', sep='')
         return
 
     def update_map(self, items) -> bool:
@@ -349,10 +364,8 @@ class Engine(BaseObject):
                       Once its life ends, the item will be removed automatically.
         @return created `Item` object
         """
-        if len(symbol) > 1:
-            self.log(f'Item symbol can only be a single character. Received "{symbol}"', 'error')
-            self.log(f'Item not added', 'warn')
-            return None
+        if len(symbol) != self.pixel_width:
+            self.log(f"Item symbol is longer than the pixel width of your map. This may cause some problem during the rendering", 'warn')
         
         if len(symbol) == 0:
             self.log('Symbol is automatically transformed into space', 'warn')
@@ -635,10 +648,18 @@ class Engine(BaseObject):
     
     def _get_tile(self, x: int, y: int) -> str:
         """ Get the tile symbol of a certain position """
-        if x == self.character[0] and y == self.character[1]:
-            return 'x'
         item = self.map[x][y]
-        return item.symbol if item and not item.hidden else ' '
+        if x == self.character[0] and y == self.character[1]:
+            symbol = self.character_char
+        elif item and not item.hidden:
+            symbol = item.symbol
+        else:
+            symbol = self.map_filler
+        
+        symbol_width = sum(str_util.get_width(ord(char)) for char in symbol)
+        width = self.pixel_width - symbol_width + 1
+        # print(x, y, width)
+        return f'{symbol:>{width}}'
     
     def _get_items(self) -> Tuple[int,int,Item]:
         """
