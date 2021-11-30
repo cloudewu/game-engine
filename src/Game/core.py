@@ -57,13 +57,13 @@ class Item(BaseObject):
         Note that all events are still triggered even if the item is hidden.
         """
         self.hidden = not flag
-        self.log(f'Item-{self.name}: set hidden to {self.hidden}')
+        self.log(f'Item-{self.name}: set hidden to {self.hidden!r}')
         return
 
     def set_block(self, flag: bool = True) -> None:
         """ Set whether the item should block user or not """
         self.block = flag
-        self.log(f'Item-{self.name}: set block to {self.block}')
+        self.log(f'Item-{self.name}: set block to {self.block!r}')
         return
     
     ### ------ EVENT FUNCTIONALITIES ------ ###
@@ -73,10 +73,10 @@ class Item(BaseObject):
         @return whether the event is successfully fired.
         """
         if event not in self.EVENT:
-            self.log(f'Item-{self.name}: event "{event}" doesn\'t exist. Event not fired', 'warn')
+            self.log(f'Item-{self.name}: event {event!r} doesn\'t exist. Event not fired', 'warn')
             return False
 
-        self.log(f'Item-{self.name}: fire "{event}" event')  
+        self.log(f'Item-{self.name}: fire {event!r} event')
         if event == 'timeout':
             self._timer[args[0]][1](self)
             del self._timer[args[0]]
@@ -95,12 +95,12 @@ class Item(BaseObject):
         @return whether the callback is successfully subscribed.
         """
         if event not in self.EVENT:
-            self.log(f'Item-{self.name}: event "{event}" not allowed. Event not registered', 'warn')
+            self.log(f'Item-{self.name}: event {event!r} not allowed. Event not registered', 'warn')
             self.log(f'Item-{self.name}: Available events: {self.EVENT}', 'warn')
             return False
         
         self._callback[event].append(callback)
-        self.log(f'Item-{self.name}: callback {callback.__name__} subscribes to the event "{event}"')
+        self.log(f'Item-{self.name}: callback {callback.__name__!r} subscribes to the event {event!r}')
         return True
 
     def unsubscribe(self, event: str, callback: Callable) -> bool:
@@ -108,14 +108,14 @@ class Item(BaseObject):
         @return whether the event is successfully unsubscribed.
         """
         if event not in self.EVENT:
-            self.log(f'Item-{self.name}: event "{event}" not found', 'warn')
+            self.log(f'Item-{self.name}: event {event!r} not found', 'warn')
             return False
         if callback not in self._callback[event]:
-            self.log(f'Item-{self.name}: callback {callback.__name__} not found', 'warn')
+            self.log(f'Item-{self.name}: callback {callback.__name__!r} not found', 'warn')
             return False
 
         self._callback[event].remove(callback)
-        self.log(f'Item-{self.name}: callback {callback.__name__} removed from the event "{event}"')
+        self.log(f'Item-{self.name}: callback {callback.__name__!r} removed from the event {event!r}')
         return True
     
     def timer(self, time: int, callback: Callable) -> int:
@@ -124,7 +124,7 @@ class Item(BaseObject):
         """
         id = random.randint(1000, 10000)
         self._timer[id] = [time, callback]
-        self.log(f'Item-{self.name}: timer {id} is added. handler: {callback.__name__}')
+        self.log(f'Item-{self.name}: timer {id} is added. handler: {callback.__name__!r}')
         return id
     
     def remove_timer(self, id: int) -> bool:
@@ -235,8 +235,8 @@ class Engine(BaseObject):
         self.renderer = self._layer_renderer[self.layer]   # current renderer
         if not self.input:
             self.input = 'pynput' if PYNPUT_AVAILABLE else 'stdin'
-            self.log(f'Autodetect input system: {self.input}')
-        self.log(f'Input system {self.input} is used')
+            self.log(f'Autodetect input system: {self.input!r}')
+        self.log(f'Input system {self.input!r} is used')
 
     def start(self) -> int:
         """ Start the game loop. 
@@ -297,10 +297,10 @@ class Engine(BaseObject):
         @param force_update - whether to force the engine render re-render current layer immediately
         """
         if name in self._layer_renderer:
-            self.log(f'layer {name} already exist. Renderer overridden.', 'warn')
+            self.log(f'layer {name!r} already exist. Renderer overridden.', 'warn')
         
         self._layer_renderer[name] = renderer
-        self.log(f'layer {name} is added with renderer {renderer.__name__}')
+        self.log(f'layer {name!r} is added with renderer {renderer.__name__!r}')
         if switch or force_update:
             self.layer = name
             self.renderer = renderer
@@ -316,13 +316,13 @@ class Engine(BaseObject):
         @return `true` if the switching is successful.
         """
         if name not in self._layer_renderer:
-            self.log(f'layer {name} is not avaliable', 'error')
+            self.log(f'layer {name!r} is not avaliable', 'error')
             self.log(f'available layer list: {str(list(self._layer_renderer.keys()))}', 'debug')
             return False
         
         self.layer = name
         self.renderer = self._layer_renderer[name]
-        self.log(f'switch to layer {self.layer} with renderer {self.renderer.__name__}')
+        self.log(f'switch to layer {self.layer!r} with renderer {self.renderer.__name__!r}')
 
         self._pause_event_once = pause_event_check
         if force_update:
@@ -377,7 +377,7 @@ class Engine(BaseObject):
             self.log(f'Original item on ({x}, {y}) is replaced', 'warn')
             self._clean_tile(x, y)
         self.map[x][y] = new_item
-        self.log(f'Item {name} is added to ({x}, {y})')
+        self.log(f'Item {name!r} is added to ({x}, {y})')
 
         return new_item
     
@@ -390,7 +390,7 @@ class Engine(BaseObject):
         """
         if hasnone([x, y]) and not allnone([x, y]):
             self.log(f'(x, y) should be specified at the same time', 'error')
-            self.log(f'item not removed.', 'warn')
+            self.log(f'item {name!r} on ({x}, {y}) not removed.', 'warn')
             return False
         
         if x is not None and name is None:
@@ -403,7 +403,7 @@ class Engine(BaseObject):
                 return False
             if self.map[x][y].name == name: 
                 return self._clean_tile(x, y)
-            self.log(f'item on ({x}, {y}) is not "{name}"')
+            self.log(f'item on ({x}, {y}) is not {name!r}')
             return False
         
         flag = False
@@ -437,10 +437,10 @@ class Engine(BaseObject):
         @return whether the event is successfully fired.
         """
         if event not in self._subscription:
-            self.log(f'event "{event}" not exist. Event not fired', 'warn')
+            self.log(f'event {event!r} not exist. Event not fired', 'warn')
             return False
 
-        self.log(f'event "{event}" is fired')
+        self.log(f'event {event!r} is fired')
         for cb in self._subscription[event]:
             cb(self)
         return True
@@ -451,11 +451,11 @@ class Engine(BaseObject):
         @return `true` if the event is successfully registered.
         """
         if name in self._subscription:
-            self.log(f'{name} already existed. event not added.', 'warn')
+            self.log(f'event {name!r} already existed. event not added.', 'warn')
             return False
         
         self._subscription[name] = []
-        self.log(f'event {name} is added')
+        self.log(f'event {name!r} is added')
         return True
     
     def subscribe(self, event: str, callback: Callable) -> bool:
@@ -464,12 +464,12 @@ class Engine(BaseObject):
         @return whether the callback is successfully subscribed.
         """
         if event not in self._subscription:
-            self.log(f'Event "{event}" not exists. Callback not subscribed', 'warn')
+            self.log(f'Event {event!r} not exists. Callback not subscribed', 'warn')
             self.log(f'Available events: {list(self._subscription.keys())}', 'warn')
             return False
     
         self._subscription[event].append(callback)
-        self.log(f'callback {callback.__name__} is subscribed to event {event}')
+        self.log(f'callback {callback.__name__!r} is subscribed to event {event!r}')
         return True
 
     def unsubscribe(self, event: str, callback: Callable) -> bool:
@@ -478,14 +478,14 @@ class Engine(BaseObject):
         @return whether the event is successfully unsubscribed.
         """
         if event not in self._subscription:
-            self.log(f'event "{event}" not found', 'warn')
+            self.log(f'event {event!r} not found', 'warn')
             return False
         if callback not in self._subscription[event]:
-            self.log(f'callback {callback.__name__} not found', 'warn')
+            self.log(f'callback {callback.__name__!r} not found', 'warn')
             return False
 
         self._subscription[event].remove(callback)
-        self.log(f'callback {callback.__name__} is unsubscribed from the event {event}')
+        self.log(f'callback {callback.__name__!r} is unsubscribed from the event {event!r}')
         return True
 
     def subscribe_keyboard(self, key: str, event: str, callback: Callable) -> bool:
@@ -504,12 +504,12 @@ class Engine(BaseObject):
             key = keyboard.KeyCode.from_char(key)
 
         if event not in self.KB_EVENT: 
-            self.log(f'action "{event}" not allowed. Callback not subscribed', 'warn')
+            self.log(f'action {event!r} not allowed. Callback not subscribed', 'warn')
             self.log(f'Available actions: {self.KB_EVENT}', 'warn')
             return False
 
         self._kb_callback[event][key].append(callback)
-        self.log(f'event "{event} {key}" subscribed')
+        self.log(f'{event!r} event with key {str(key)!r} subscribed')
         return True
 
     def unsubscribe_keyboard(self, key: str, event: str, callback: Callable) -> bool:
@@ -525,14 +525,14 @@ class Engine(BaseObject):
             key = keyboard.KeyCode.from_char(key)
 
         if event not in self.KB_EVENT: 
-            self.log(f'action "{event}" not found', 'warn')
+            self.log(f'action {event!r} not found', 'warn')
             return False
         if callback not in self._kb_callback[event][key]:
-            self.log(f'callback {callback.__name__} not found', 'warn')
+            self.log(f'callback {callback.__name__!r} not found', 'warn')
             return False
         
         self._kb_callback[event][key].remove(callback) # stdin
-        self.log(f'event "{event} {key}" unsubscribed')
+        self.log(f'{event!r} event with key {str(key)!r} unsubscribed')
         return True
 
     def timer(self, time: int, callback: Callable) -> int:
@@ -549,7 +549,7 @@ class Engine(BaseObject):
         @return whether the timer is successfully removed.
         """
         if id not in self._timer:
-            self.log(f'timer {id} not found ({self.name})', 'warn')
+            self.log(f'timer {id} not found', 'warn')
             return False
         del self._timer[id]
         self.log(f'timer {id} is removed')
@@ -579,14 +579,14 @@ class Engine(BaseObject):
         if self.input == 'pynput':
             with keyboard.Events() as events:
                 event = events.get()
-                self.log('Received event {} (pynput)'.format(event))
+                self.log(f'Received event {str(event)!r} (pynput)')
                 updated = self._handle_keyboard(event)
         elif self.input == 'stdin':
             event = input('input: ').lower()
-            self.log('Received input {} (stdin)'.format(event))
+            self.log(f'Received input {event!r} (stdin)')
             updated = self._handle_stdin(event)
         else:
-            self.log(f'Selected input system {self.input} not supported.', 'error')
+            self.log(f'Selected input system {self.input!r} not supported.', 'error')
             self.end()
         return updated
 
@@ -679,7 +679,7 @@ class Engine(BaseObject):
         if not item: return False
         item.fire('removed')
         self.map[x][y] = None
-        self.log(f'Item {item.name} on ({x}, {y}) is removed')
+        self.log(f'Item {item.name!r} on ({x}, {y}) is removed')
         return True
     
     def _print_map(self):
