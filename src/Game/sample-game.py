@@ -28,17 +28,17 @@ def map_renderer(game):
 
 # SETUP
 WIDTH, HEIGHT = 40, 10
-game = Engine(WIDTH, HEIGHT,           # The map size of your game
-              move,                    # The movement controller you write
-              # init_x = 0,            # initial x position of character
-              # init_y = 1,            # initial y position of character
-              # input = 'stdin',       # the input system (default to autodetected system)
-              # pixel_width = 2,       # the width of every pixel during the rendering (default to 1)
-              # character_char = '⭐', # symbol for your character (default to 'x')
-              # map_filler = '..',     # what character to fill you empty map (default to ' ')
-              # map_renderer,          # write your own map renderer 
-                                       # (use this only when you are confident about what you are doing)
-              debug = True             # open the debug mode
+game = Engine(WIDTH, HEIGHT,                 # The map size of your game
+              move,                          # The movement controller you write
+              # init_x = 0,                  # initial x position of character
+              # init_y = 1,                  # initial y position of character
+              # input = 'stdin',             # the input system (default to autodetected system)
+              # pixel_width = 2,             # the width of every pixel during the rendering (default to 1)
+              # character_char = '⭐',       # symbol for your character (default to 'x')
+              # map_filler = '..',           # what character to fill you empty map (default to ' ')
+              # map_renderer = map_renderer, # write your own map renderer 
+                                             # (use this only when you are confident about what you are doing)
+              debug = True                   # open the debug mode
              )
 
 # DEMO: custom layer
