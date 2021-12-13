@@ -305,7 +305,7 @@ class Engine(BaseObject):
             self.layer = name
             self.renderer = renderer
         if force_update:
-            self.renderer()
+            self.renderer(self)
         return
 
     def switch_layer(self, name: str, force_update: bool = False, pause_event_check: bool = True) -> bool:
@@ -326,7 +326,7 @@ class Engine(BaseObject):
 
         self._pause_event_once = pause_event_check
         if force_update:
-            self.renderer()
+            self.renderer(self)
         return True
     
     def default_map_renderer(self, *args) -> None:
