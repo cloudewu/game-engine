@@ -1,7 +1,6 @@
 from operator import itemgetter
 from collections import defaultdict
 from typing import Callable, Tuple
-from urwid import str_util
 import random
 PYNPUT_AVAILABLE = True
 try:
@@ -10,7 +9,7 @@ except ImportError:
     PYNPUT_AVAILABLE = False
 
 from .base import BaseObject
-from .util import hasnone, allnone
+from .util import hasnone, allnone, pixel_width
 
 class Item(BaseObject):
     EVENT = ['enter', 'leave', 'timeout', 'removed']
@@ -364,7 +363,7 @@ class Engine(BaseObject):
                       Once its life ends, the item will be removed automatically.
         @return created `Item` object
         """
-        if self._get_length(symbol) > self.pixel_width:
+        if pixel_width(symbol) > self.pixel_width:
             self.log(f"Item symbol is longer than the pixel width of your map. This may cause some problem during the rendering", 'warn')
         
         if len(symbol) == 0:
@@ -656,7 +655,7 @@ class Engine(BaseObject):
         else:
             symbol = self.map_filler
         
-        symbol_width = self._get_length(symbol)
+        symbol_width = pixel_width(symbol)
         width = self.pixel_width - symbol_width + 1
         # print(x, y, width)
         return f'{symbol:>{width}}'
@@ -686,7 +685,3 @@ class Engine(BaseObject):
         """ Print all objects on the map array. Just for debugging """
         for row in self.map:
             self.log(row)
-
-    @staticmethod
-    def _get_length(symbol):
-        return sum(str_util.get_width(ord(char)) for char in symbol)
